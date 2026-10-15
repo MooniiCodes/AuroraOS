@@ -157,14 +157,45 @@ void draw_string(volatile u8 *fb, int x, int y, int screen_height,
     if (*str == '\n') {
       cx = x;
       y += FONT_HEIGHT;
-    } else if (((unsigned char)*str & 0xC0u) == 0x80u) {
-      /* UTF-8 continuation byte: the lead byte already took the cell, so an
-       * accented letter the 8x8 font lacks leaves one gap, not two. */
+      str++;
     } else {
-      draw_char(fb, cx, y, screen_height, *str, fg, bg);
+      unsigned cp = (unsigned char)*str;
+      int mark = 0;
+      if (cp >= 0xC2u && cp <= 0xC3u && str[1] &&
+          ((unsigned char)str[1] & 0xC0u) == 0x80u) {
+        cp = ((cp & 0x1Fu) << 6) | ((unsigned char)str[1] & 0x3Fu);
+        str += 2;
+        /* Latin-1 letters are rendered as their ASCII base plus a small
+         * accent. The fallback font stays useful even without assets.pak. */
+        if (cp >= 0xC0u && cp <= 0xC5u) { mark = cp == 0xC0u ? 1 : cp == 0xC1u ? 2 : cp == 0xC2u ? 6 : cp == 0xC3u ? 3 : cp == 0xC4u ? 7 : 4; cp = 'A'; }
+        else if (cp >= 0xE0u && cp <= 0xE5u) { mark = cp == 0xE0u ? 1 : cp == 0xE1u ? 2 : cp == 0xE2u ? 6 : cp == 0xE3u ? 3 : cp == 0xE4u ? 7 : 4; cp = 'a'; }
+        else if (cp == 0xC7u) { cp = 'C'; mark = 5; }
+        else if (cp == 0xE7u) { cp = 'c'; mark = 5; }
+        else if (cp == 0xD1u) { cp = 'N'; mark = 3; }
+        else if (cp == 0xF1u) { cp = 'n'; mark = 3; }
+        else if (cp >= 0xC8u && cp <= 0xCBu) { mark = cp == 0xC8u ? 1 : cp == 0xC9u ? 2 : cp == 0xCAu ? 6 : 7; cp = 'E'; }
+        else if (cp >= 0xE8u && cp <= 0xEBu) { mark = cp == 0xE8u ? 1 : cp == 0xE9u ? 2 : cp == 0xEAu ? 6 : 7; cp = 'e'; }
+        else if (cp >= 0xCCu && cp <= 0xCFu) { mark = cp == 0xCCu ? 1 : cp == 0xCDu ? 2 : cp == 0xCEu ? 6 : 7; cp = 'I'; }
+        else if (cp >= 0xECu && cp <= 0xEFu) { mark = cp == 0xECu ? 1 : cp == 0xEDu ? 2 : cp == 0xEEu ? 6 : 7; cp = 'i'; }
+        else if (cp == 0xD2u || cp == 0xD3u || cp == 0xD4u || cp == 0xD6u) { mark = cp == 0xD2u ? 1 : cp == 0xD3u ? 2 : cp == 0xD4u ? 6 : 7; cp = 'O'; }
+        else if (cp == 0xF2u || cp == 0xF3u || cp == 0xF4u || cp == 0xF6u) { mark = cp == 0xF2u ? 1 : cp == 0xF3u ? 2 : cp == 0xF4u ? 6 : 7; cp = 'o'; }
+        else if (cp == 0xD9u || cp == 0xDAu || cp == 0xDBu || cp == 0xDCu) { mark = cp == 0xD9u ? 1 : cp == 0xDAu ? 2 : cp == 0xDBu ? 6 : 7; cp = 'U'; }
+        else if (cp == 0xF9u || cp == 0xFAu || cp == 0xFBu || cp == 0xFCu) { mark = cp == 0xF9u ? 1 : cp == 0xFAu ? 2 : cp == 0xFBu ? 6 : 7; cp = 'u'; }
+        else if (cp == 0xDDu) { cp = 'Y'; mark = 2; }
+        else if (cp == 0xFDu || cp == 0xFFu) { cp = 'y'; mark = cp == 0xFFu ? 7 : 2; }
+      } else {
+        str++;
+      }
+      draw_char(fb, cx, y, screen_height, (char)cp, fg, bg);
+      if (mark == 1) { draw_pixel(fb, cx + 3, y, screen_height, fg); draw_pixel(fb, cx + 4, y + 1, screen_height, fg); }
+      else if (mark == 2) { draw_pixel(fb, cx + 3, y + 1, screen_height, fg); draw_pixel(fb, cx + 4, y, screen_height, fg); }
+      else if (mark == 3) { draw_pixel(fb, cx + 2, y, screen_height, fg); draw_pixel(fb, cx + 3, y + 1, screen_height, fg); draw_pixel(fb, cx + 4, y, screen_height, fg); }
+      else if (mark == 4) { draw_pixel(fb, cx + 3, y, screen_height, fg); draw_pixel(fb, cx + 4, y, screen_height, fg); }
+      else if (mark == 5) { draw_pixel(fb, cx + 4, y + 6, screen_height, fg); draw_pixel(fb, cx + 3, y + 7, screen_height, fg); }
+      else if (mark == 6) { draw_pixel(fb, cx + 3, y, screen_height, fg); draw_pixel(fb, cx + 4, y + 1, screen_height, fg); draw_pixel(fb, cx + 5, y, screen_height, fg); }
+      else if (mark == 7) { draw_pixel(fb, cx + 2, y, screen_height, fg); draw_pixel(fb, cx + 4, y, screen_height, fg); }
       cx += FONT_WIDTH;
     }
-    str++;
   }
 }
 
