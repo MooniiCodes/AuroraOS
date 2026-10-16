@@ -1089,6 +1089,14 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
      "Configura el Wi-Fi para vincular una cuenta.",
      "Configurez le Wi-Fi pour lier un compte."},
     /* STR_AC_PLEASE_WAIT*/ {"Please wait", "Espera un momento", "Veuillez patienter"},
+    /* STR_ASSETS_FAILED */ {"assets.pak not loaded", "assets.pak no cargado",
+                             "assets.pak non charg\u00E9"},
+    /* STR_ASSETS_FALLBACK */ {"Using built-in art. Press A.",
+                               "Gr\u00E1ficos b\u00E1sicos. Pulsa A.",
+                               "Graphismes int\u00E9gr\u00E9s. A pour continuer."},
+    /* STR_ABOUT_SCROLL_HINT */ {"D-pad / swipe: scroll   B: back",
+                                 "D-pad / deslizar: mover   B: volver",
+                                 "Fl\u00E8ches / glisser : d\u00E9filer   B : retour"},
 };
 
 const char *L(StringId id) {
@@ -1294,7 +1302,8 @@ static void bottom_title(const char *s) {
 
 static int setup_power_chord(u32 k) {
   const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
-  if ((get_keys() & chord) != chord || !(k & chord))
+  if ((get_keys() & chord) != chord ||
+      !(get_keys_physical_down() & chord) || !(k & chord))
     return 0;
   home_system_menu(0);
   return 1;

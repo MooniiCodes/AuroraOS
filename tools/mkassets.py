@@ -86,11 +86,11 @@ ART = [
 # Faces for the About page's More Info credits, cut to a circle rather than to
 # ROUND_FRAC. (asset id, source, size).
 PEOPLE = [
-    ('PERSON_DISLOPIK', 'people/dislopik.png', 40),
-    ('PERSON_STAR',     'people/star.png',     40),
-    ('PERSON_ATEXBG',   'people/atexbg.png',   40),
-    ('PERSON_KYAERO',   'people/kyaero.png',   40),
-    ('PERSON_SECRET',   'people/secret.png',   40),
+    ('PERSON_DISLOPIK',  'people/dislopik.png',  40),
+    ('PERSON_STAR',      'people/star.png',      40),
+    ('PERSON_ATEXBG',    'people/atexbg.png',    40),
+    ('PERSON_KYAERO',    'people/kyaero.png',    40),
+    ('PERSON_SECRET',    'people/secret.png',    40),
 ]
 
 # (asset id, ttf, pixel size). Each atlas covers U+0020..U+00FF (Latin-1). The

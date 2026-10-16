@@ -1568,7 +1568,8 @@ void home_run(void) {
     /* A chord outside normal navigation opens the system power menu. */
     {
       const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
-      if ((get_keys() & chord) == chord && (k & chord)) {
+      if ((get_keys() & chord) == chord &&
+          (get_keys_physical_down() & chord)) {
         home_system_menu(1);
         continue;
       }
