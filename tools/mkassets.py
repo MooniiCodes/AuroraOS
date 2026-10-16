@@ -89,7 +89,6 @@ PEOPLE = [
     ('PERSON_DISLOPIK',  'people/dislopik.png',  40),
     ('PERSON_STAR',      'people/star.png',      40),
     ('PERSON_ATEXBG',    'people/atexbg.png',    40),
-    ('PERSON_SAIITANAA', 'people/saiitanaa.png', 40),
     ('PERSON_KYAERO',    'people/kyaero.png',    40),
     ('PERSON_SECRET',    'people/secret.png',    40),
 ]
