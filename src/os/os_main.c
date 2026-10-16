@@ -2395,7 +2395,7 @@ static void about_bottom(const char *sd) {
   *p = 0;
 
   value[0] = AURORA_VERSION;
-  value[1] = aurora_is_new3ds() ? "New 3DS" : "Old 3DS";
+  value[1] = aurora_is_new3ds() ? "New 3DS/2DS" : "Old 3DS/2DS";
   value[2] = bat;
   value[3] = sd;
   value[4] = "GPL-3.0";

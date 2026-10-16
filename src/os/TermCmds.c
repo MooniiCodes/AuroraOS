@@ -1477,7 +1477,7 @@ static void cmd_systemctl(int argc, char **argv) {
     t_u32((u32)failed, TC_TEXT);
     t_line(" failed", TC_TEXT);
     t_out("    Model: ", TC_DIM);
-    t_line(aurora_is_new3ds() ? "New 3DS" : "Old 3DS", TC_TEXT);
+    t_line(aurora_is_new3ds() ? "New 3DS/2DS" : "Old 3DS/2DS", TC_TEXT);
     t_out("   System: ", TC_DIM);
     t_out("AuroraOS ", TC_TEXT);
     t_line(AURORA_VERSION, TC_TEXT);
