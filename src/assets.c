@@ -9,6 +9,8 @@
 #define PAK_MAGIC   0x4B415041u /* "APAK" */
 #define PAK_VERSION 1u
 #define PAK_PATH    "0:/Aurora/assets.pak"
+#define ASSETS_LOAD_ATTEMPTS 3u
+#define ASSETS_RETRY_DELAY   60000u
 
 typedef struct {
   uint32_t magic, version, count, data_off, arena, reserved[3];
@@ -37,26 +39,29 @@ static PakEntry g_table[ASSET_COUNT];
 static uint8_t g_scratch[ASSET_MAX_CSIZE];
 
 /* 0x01..0x7F: run of n copies of the next byte. 0x81..0xFF: n literals. */
-static void rle_decode(const uint8_t *src, uint32_t csize, uint8_t *dst,
-                       uint32_t usize) {
+static int rle_decode(const uint8_t *src, uint32_t csize, uint8_t *dst,
+                      uint32_t usize) {
   const uint8_t *send = src + csize;
   uint8_t *out = dst, *oend = dst + usize;
-  while (src < send && out < oend) {
+  while (src < send) {
     uint8_t c = *src++;
     if (c & 0x80) {
       uint32_t n = c & 0x7Fu;
-      while (n-- && out < oend && src < send)
+      if (!n || n > (uint32_t)(oend - out) || n > (uint32_t)(send - src))
+        return 0;
+      while (n--)
         *out++ = *src++;
     } else {
       uint32_t n = c;
       uint8_t v;
-      if (src >= send)
-        break;
+      if (!n || n > (uint32_t)(oend - out) || src >= send)
+        return 0;
       v = *src++;
-      while (n-- && out < oend)
+      while (n--)
         *out++ = v;
     }
   }
+  return out == oend;
 }
 
 int assets_ok(void) { return g_ok; }
@@ -71,7 +76,7 @@ const Asset *asset_get(uint32_t id) {
 int asset_font(uint32_t id, Font *out) {
   const Asset *a = asset_get(id);
   const AssetFontHead *h;
-  if (!a || a->type != ASSET_TYPE_FONT)
+  if (!a || !out || a->type != ASSET_TYPE_FONT)
     return 0;
   h = (const AssetFontHead *)a->data;
   out->head = h;
@@ -88,15 +93,22 @@ static int fail(const char *why) {
 
 int assets_load(void) {
   static FATFS fs;
-  int ok = 0;
+  int mounted, ok = 0;
 
   if (g_ok)
     return 1;
-  if (f_mount(&fs, "", 1) == FR_OK)
-    ok = assets_read();
-  else
-    fail("no SD card");
-  f_mount(NULL, "", 0);
+  for (unsigned attempt = 0; attempt < ASSETS_LOAD_ATTEMPTS; attempt++) {
+    mounted = f_mount(&fs, "", 1) == FR_OK;
+    if (mounted)
+      ok = assets_read();
+    else
+      fail("no SD card");
+    f_mount(NULL, "", 0);
+    if (ok)
+      break;
+    if (attempt + 1u < ASSETS_LOAD_ATTEMPTS)
+      delay(ASSETS_RETRY_DELAY);
+  }
   return ok;
 }
 
@@ -105,6 +117,9 @@ int assets_read(void) {
   PakHead head;
   UINT br;
   uint32_t i, used = 0;
+  uint8_t seen[ASSET_COUNT] = {0};
+  uint32_t expected_data_off;
+  FSIZE_t file_size;
   uint8_t *arena = (uint8_t *)ASSETS_ARENA_ADDR;
 
   if (g_ok)
@@ -129,6 +144,13 @@ int assets_read(void) {
     return fail("pack too large for the arena");
   }
 
+  expected_data_off = sizeof(PakHead) + sizeof(PakEntry) * head.count;
+  file_size = f_size(&f);
+  if (head.data_off != expected_data_off || head.data_off > file_size) {
+    f_close(&f);
+    return fail("pack index offset invalid");
+  }
+
   if (f_read(&f, g_table, sizeof(PakEntry) * head.count, &br) != FR_OK ||
       br != sizeof(PakEntry) * head.count) {
     f_close(&f);
@@ -137,22 +159,62 @@ int assets_read(void) {
 
   for (i = 0; i < head.count; i++) {
     const PakEntry *e = &g_table[i];
-    if (e->id >= ASSET_COUNT || e->csize > ASSET_MAX_CSIZE ||
-        used + e->usize > ASSETS_ARENA_MAX) {
+    if (e->id >= ASSET_COUNT || seen[e->id] || !e->usize || !e->csize ||
+        e->csize > ASSET_MAX_CSIZE || used > ASSETS_ARENA_MAX ||
+        e->usize > ASSETS_ARENA_MAX - used || e->off < head.data_off ||
+        e->off > file_size || e->csize > file_size - e->off) {
       f_close(&f);
       return fail("pack entry out of range");
     }
+    seen[e->id] = 1;
     if (f_lseek(&f, e->off) != FR_OK ||
         f_read(&f, g_scratch, e->csize, &br) != FR_OK || br != e->csize) {
       f_close(&f);
       return fail("pack payload unreadable");
     }
-    rle_decode(g_scratch, e->csize, arena + used, e->usize);
+    if (!rle_decode(g_scratch, e->csize, arena + used, e->usize)) {
+      f_close(&f);
+      return fail("pack payload malformed");
+    }
+    if (e->type == ASSET_TYPE_ALPHA8 || e->type == ASSET_TYPE_RGBA) {
+      uint64_t expected = (uint64_t)e->w * e->h;
+      if (e->type == ASSET_TYPE_RGBA)
+        expected *= 4u;
+      if (!e->w || !e->h || expected != e->usize) {
+        f_close(&f);
+        return fail("pack image size invalid");
+      }
+    } else if (e->type == ASSET_TYPE_FONT) {
+      const AssetFontHead *font = (const AssetFontHead *)(arena + used);
+      uint64_t expected = sizeof(AssetFontHead) +
+                          (uint64_t)font->count * sizeof(AssetGlyph) +
+                          (uint64_t)font->atlas_w * font->atlas_h;
+      if (!font->count || !font->atlas_w || !font->atlas_h ||
+          expected != e->usize) {
+        f_close(&f);
+        return fail("pack font size invalid");
+      }
+    } else {
+      f_close(&f);
+      return fail("pack asset type invalid");
+    }
     g_assets[e->id].type = e->type;
     g_assets[e->id].w = e->w;
     g_assets[e->id].h = e->h;
     g_assets[e->id].data = arena + used;
     used += (e->usize + 3u) & ~3u;
+  }
+
+  if (used != head.arena) {
+    f_close(&f);
+    return fail("pack arena size mismatch");
+  }
+  if (g_assets[ASSET_FONT_SMALL].type != ASSET_TYPE_FONT ||
+      g_assets[ASSET_FONT_UI].type != ASSET_TYPE_FONT ||
+      g_assets[ASSET_FONT_BOLD].type != ASSET_TYPE_FONT ||
+      g_assets[ASSET_FONT_TITLE].type != ASSET_TYPE_FONT) {
+    f_close(&f);
+    return fail("required font missing");
   }
 
   f_close(&f);

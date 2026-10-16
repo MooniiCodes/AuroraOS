@@ -2435,6 +2435,7 @@ static const Person team[] = {
     {ASSET_PERSON_DISLOPIK_40, "DisLoPik", "CEO"},
     {ASSET_PERSON_STAR_40,     "Star",     "Founder"},
     {ASSET_PERSON_ATEXBG_40,   "AtexBg",   "Low-level Developer"},
+    {ASSET_PERSON_SAIITANAA_40,"Saiitanaa","Low-level Developer"},
     {ASSET_PERSON_KYAERO_40,   "Kyaero",   "Interface Designer"},
     {ASSET_PERSON_SECRET_40,   "Secret",   "Drivers and GPIO"},
 };
@@ -2444,6 +2445,8 @@ static const Person team[] = {
 #define TEAM_Y0    8
 #define TEAM_STEP  45
 #define TEAM_AV    40
+#define TEAM_VISIBLE 5
+#define TEAM_MAX_SCROLL (TEAM_COUNT - TEAM_VISIBLE)
 
 /* The eMMC CID as GodMode9 prints it: the 16 bytes in order. `out` takes 33
  * bytes. */
@@ -2498,20 +2501,21 @@ static void info_top(void) {
             y + (ui_th(&ui_font) - ui_th(vf)) / 2, sh, shown, COLOR_HM_TEXT2,
             COLOR_HM_BG_BOT, vf);
   }
-  ui_text_mid(fb, TOP_SCREEN_WIDTH / 2, sh - 24, sh, L(STR_B_BACK),
+  ui_text_mid(fb, TOP_SCREEN_WIDTH / 2, sh - 24, sh,
+              L(STR_ABOUT_SCROLL_HINT),
               COLOR_HM_TEXT2, COLOR_HM_BG_BOT, &ui_small);
   screen_present_top();
 }
 
-static void info_bottom(void) {
+static void info_bottom(int scroll) {
   volatile u8 *fb = VRAM_BOT_A;
   const int sh = BOT_SCREEN_HEIGHT;
 
   ui_wallpaper(fb, BOT_SCREEN_WIDTH, sh, sh);
   draw_gradient_round_rect(fb, 8, 2, BOT_SCREEN_WIDTH - 16, sh - 6, 14, sh,
                            COLOR_PANEL_TOP, COLOR_PANEL_BOT);
-  for (int i = 0; i < TEAM_COUNT; i++) {
-    int y = TEAM_Y0 + i * TEAM_STEP;
+  for (int i = scroll; i < TEAM_COUNT && i < scroll + TEAM_VISIBLE; i++) {
+    int y = TEAM_Y0 + (i - scroll) * TEAM_STEP;
     /* A disc under the face, so the row still reads without the asset pack. */
     draw_filled_round_rect(fb, TEAM_X, y, TEAM_AV, TEAM_AV, TEAM_AV / 2, sh,
                            COLOR_HM_SLOT);
@@ -2525,13 +2529,44 @@ static void info_bottom(void) {
 }
 
 static void info_screen(void) {
+  int scroll = 0, touch_scroll = 0, touch_last_y = 0;
   info_top();
-  info_bottom();
+  info_bottom(scroll);
   for (;;) {
     u32 k = get_keys_down();
     int tx, ty;
-    if ((k & (BUTTON_A | BUTTON_B)) || touch_tap(&tx, &ty))
+    int redraw = 0;
+    if (k & (BUTTON_A | BUTTON_B))
       return;
+    if ((k & BUTTON_DUP) && scroll > 0) {
+      scroll--;
+      redraw = 1;
+    } else if ((k & BUTTON_DDOWN) && scroll < TEAM_MAX_SCROLL) {
+      scroll++;
+      redraw = 1;
+    }
+    if (touch_tap(&tx, &ty)) {
+      if (!touch_in(tx, ty, 8, 2, BOT_SCREEN_WIDTH - 16,
+                    BOT_SCREEN_HEIGHT - 8))
+        return;
+      touch_scroll = 1;
+      touch_last_y = ty;
+    }
+    if (touch_scroll) {
+      if (!touch_read(&tx, &ty, NULL, NULL)) {
+        touch_scroll = 0;
+      } else if (touch_last_y - ty >= 24 && scroll < TEAM_MAX_SCROLL) {
+        scroll++;
+        touch_last_y = ty;
+        redraw = 1;
+      } else if (ty - touch_last_y >= 24 && scroll > 0) {
+        scroll--;
+        touch_last_y = ty;
+        redraw = 1;
+      }
+    }
+    if (redraw)
+      info_bottom(scroll);
     ui_idle();
   }
 }
@@ -3242,6 +3277,23 @@ static void power_off_now(void) {
   power_shutdown();
 }
 
+static void assets_warning(void) {
+  ui_wallpaper(VRAM_BOT_A, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT,
+               BOT_SCREEN_HEIGHT);
+  ui_dialog(VRAM_BOT_A, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT,
+            BOT_SCREEN_HEIGHT, L(STR_ASSETS_FAILED), L(STR_ASSETS_FALLBACK),
+            g_accent, 1);
+  screen_present_bottom();
+  for (;;) {
+    u32 k = get_keys_down();
+    int tx, ty;
+    if ((k & (BUTTON_A | BUTTON_B)) || touch_tap(&tx, &ty))
+      break;
+    ui_idle();
+  }
+  anim_transition(ANIM_FADE, ANIM_BOT);
+}
+
 static void home_open(const HomeApp *app) {
   if (app->action == ACT_LAUNCH)
     os_launch_app(app->path); /* returns only if the launch failed */
@@ -3334,6 +3386,7 @@ void os_main(void) {
   /* The asset pack needs neither the core nor the GPU, so it loads while a
    * freshly woken core sets up the codec and touchscreen. */
   ui_init();
+  int assets_failed = !ui_assets;
   boot_mark(BT_UI);
 
   if (audio_wait_ready(CORE_WAIT_MS))
@@ -3364,6 +3417,9 @@ void os_main(void) {
   /* Now that the accent is known. */
   ui_bg_build();
   boot_mark(BT_BG);
+
+  if (assets_failed)
+    assets_warning();
 
   scan_apps();
   build_home();
