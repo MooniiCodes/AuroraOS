@@ -18,6 +18,7 @@ The bottom screen has a bar along the top and a grid of 5 x 3 tiles under it.
 | Part | Does |
 |------|------|
 | Power icon, left of the bar | asks "Turn off the console?", then powers off |
+| L + Down + Select | opens the system menu for power off or reboot |
 | `< Name`, inside a folder | back to where the folder is |
 | Settings icon, right of the bar | opens Settings, as START does |
 | Grid | SD apps (from `SD:/Aurora/Apps`, and C apps from `SD:/Aurora/Apps/C`), Music, Files, 3D Model, aShop and folders |
@@ -185,6 +186,8 @@ icon); an older pack is refused, and the menu then draws its built-in icons.
 
 1. The power icon is at the top left of the bottom screen and asks before
    turning off. There is no Power Off tile.
+   Press L + Down + Select to open the system menu and choose power off or
+   reboot instead.
 2. With more than fifteen apps the dots appear; swipe or press L/R.
 3. Hold a tile, drag it, and let go somewhere else. Drag one onto the middle
    of another app to make a folder.
