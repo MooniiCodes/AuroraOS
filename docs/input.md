@@ -40,8 +40,14 @@ and +y up; the ADC's X runs right to left, so it is flipped. It returns 0, and
 zeros, under an older core. The core is only asked its version once, because
 `audio_version()` syncs both caches.
 
-No dead zone or range is applied there. The 3D Model screen uses a dead zone
-of 150 and full deflection at 1000 raw units; see [`soft3d.md`](soft3d.md).
+The OS navigation loop maps the pad to the D-pad directions, so lists and menus
+can use the same movement and repeat behavior with either control. It activates
+at 420 units and releases at 260 to prevent small ADC drift from moving the
+selection. Shortcuts that depend on a physical button chord still check the
+buttons themselves.
+
+The raw reader applies no dead zone or range. The 3D Model screen uses a dead
+zone of 150 and full deflection at 1000 raw units; see [`soft3d.md`](soft3d.md).
 
 Works on a New 3DS (orbiting the cube, 2026-10-02); the pad's full range has
 not been measured.

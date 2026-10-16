@@ -46,14 +46,58 @@ u32 get_keys(void) { return ~REG_HID_PAD & 0xFFF; }
 #define KEY_REPEAT_RATE_US   70000u
 
 static u32 prev_keys = 0;
+static u32 prev_physical_keys = 0;
+static u32 last_physical_down = 0;
+static u32 prev_cpad_dirs = 0;
+static int cpad_nav_enabled = 1;
 static u32 repeat_mark;
 static u32 repeat_wait;
 
 #define SCREENSHOT_KEYS (BUTTON_L | BUTTON_R)
+#define CPAD_MENU_ON  420
+#define CPAD_MENU_OFF 260
+
+static u32 cpad_directions(void) {
+  int x, y;
+  u32 dirs = 0;
+
+  if (!cpad_nav_enabled) {
+    prev_cpad_dirs = 0;
+    return 0;
+  }
+  if (!cpad_read(&x, &y, NULL, NULL)) {
+    prev_cpad_dirs = 0;
+    return 0;
+  }
+
+  if (x >= CPAD_MENU_ON ||
+      ((prev_cpad_dirs & BUTTON_DRIGHT) && x >= CPAD_MENU_OFF))
+    dirs |= BUTTON_DRIGHT;
+  else if (x <= -CPAD_MENU_ON ||
+           ((prev_cpad_dirs & BUTTON_DLEFT) && x <= -CPAD_MENU_OFF))
+    dirs |= BUTTON_DLEFT;
+
+  if (y >= CPAD_MENU_ON ||
+      ((prev_cpad_dirs & BUTTON_DUP) && y >= CPAD_MENU_OFF))
+    dirs |= BUTTON_DUP;
+  else if (y <= -CPAD_MENU_ON ||
+           ((prev_cpad_dirs & BUTTON_DDOWN) && y <= -CPAD_MENU_OFF))
+    dirs |= BUTTON_DDOWN;
+
+  prev_cpad_dirs = dirs;
+  return dirs;
+}
 
 u32 get_keys_down(void) {
   crash_poll_arm11();
-  u32 cur = get_keys();
+  u32 physical = get_keys();
+  u32 cpad = cpad_directions();
+  if (physical & (BUTTON_DLEFT | BUTTON_DRIGHT))
+    cpad &= ~(u32)(BUTTON_DLEFT | BUTTON_DRIGHT);
+  if (physical & (BUTTON_DUP | BUTTON_DDOWN))
+    cpad &= ~(u32)(BUTTON_DUP | BUTTON_DDOWN);
+  u32 cur = physical | cpad;
+  u32 physical_down = physical & ~prev_physical_keys;
   u32 down = cur & ~prev_keys;
   u32 held = cur & prev_keys & KEY_REPEAT_MASK;
 
@@ -74,8 +118,17 @@ u32 get_keys_down(void) {
     repeat_wait = KEY_REPEAT_RATE_US;
   }
 
+  last_physical_down = physical_down;
+  prev_physical_keys = physical;
   prev_keys = cur;
   return down;
+}
+
+u32 get_keys_physical_down(void) { return last_physical_down; }
+
+void set_cpad_nav_enabled(int enabled) {
+  cpad_nav_enabled = enabled != 0;
+  prev_cpad_dirs = 0;
 }
 
 static u32 str_len(const char *s) {

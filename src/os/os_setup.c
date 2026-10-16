@@ -1302,7 +1302,8 @@ static void bottom_title(const char *s) {
 
 static int setup_power_chord(u32 k) {
   const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
-  if ((get_keys() & chord) != chord || !(k & chord))
+  if ((get_keys() & chord) != chord ||
+      !(get_keys_physical_down() & chord) || !(k & chord))
     return 0;
   home_system_menu(0);
   return 1;

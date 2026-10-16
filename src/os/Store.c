@@ -1823,6 +1823,8 @@ static int page_screen(int it, int push_top) {
   screen_present_bottom();
   touch_arm();
 
+  /* This page already uses the circle pad for smooth analog scrolling. */
+  set_cpad_nav_enabled(0);
   while (1) {
     u32 k = get_keys_down();
     int b = -1, ms, cx, cy;
@@ -1867,6 +1869,7 @@ static int page_screen(int it, int push_top) {
     clock_poll(0);
     ui_idle();
   }
+  set_cpad_nav_enabled(1);
   settle();
   anim_transition(ANIM_POP, push_top ? ANIM_BOTH : ANIM_BOT);
   return anim_px(&sc);
