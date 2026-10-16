@@ -12,6 +12,7 @@
 #define I2C_DIRE_WRITE (0u)
 #define I2C_IRQ_ENABLE (1u << 6)
 #define I2C_ENABLE     (1u << 7)
+#define I2C_BUSY_TIMEOUT 1000000u
 #define I2C_GET_ACK(reg) ((bool)((reg) >> 4 & 1u))
 
 typedef struct {
@@ -40,15 +41,19 @@ static I2cRegs *i2cGetBusRegsBase(uint8_t busId) {
     }
 }
 
-static void i2cWaitBusy(I2cRegs *const regs) {
-    while (regs->REG_I2C_CNT & I2C_ENABLE)
-        ;
+static bool i2cWaitBusy(I2cRegs *const regs) {
+    for (uint32_t timeout = I2C_BUSY_TIMEOUT; timeout; timeout--)
+        if (!(regs->REG_I2C_CNT & I2C_ENABLE))
+            return true;
+    return false;
 }
 
 void I2C_init(void) {
     for (uint8_t bus = 0; bus < 3; bus++) {
         I2cRegs *regs = i2cGetBusRegsBase(bus);
-        i2cWaitBusy(regs);
+        /* A stuck peripheral must not hang the whole OS during startup. */
+        if (!i2cWaitBusy(regs))
+            continue;
         regs->REG_I2C_CNTEX = 2;
         regs->REG_I2C_SCL   = 1280;
     }
@@ -59,12 +64,14 @@ static bool i2cStartTransfer(I2cDevice devId, uint8_t regAddr, bool read,
     const uint8_t devAddr = i2cDevTable[devId].devAddr;
 
     for (uint32_t i = 0; i < 8; i++) {
-        i2cWaitBusy(regs);
+        if (!i2cWaitBusy(regs))
+            return false;
 
         /* Select device (write) and start. */
         regs->REG_I2C_DATA = devAddr;
         regs->REG_I2C_CNT  = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_START;
-        i2cWaitBusy(regs);
+        if (!i2cWaitBusy(regs))
+            return false;
         if (!I2C_GET_ACK(regs->REG_I2C_CNT)) {
             regs->REG_I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_ERROR | I2C_STOP;
             continue;
@@ -73,7 +80,8 @@ static bool i2cStartTransfer(I2cDevice devId, uint8_t regAddr, bool read,
         /* Select the register. */
         regs->REG_I2C_DATA = regAddr;
         regs->REG_I2C_CNT  = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIRE_WRITE;
-        i2cWaitBusy(regs);
+        if (!i2cWaitBusy(regs))
+            return false;
         if (!I2C_GET_ACK(regs->REG_I2C_CNT)) {
             regs->REG_I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_ERROR | I2C_STOP;
             continue;
@@ -83,7 +91,8 @@ static bool i2cStartTransfer(I2cDevice devId, uint8_t regAddr, bool read,
             /* Repeated start, reselect the device in read mode. */
             regs->REG_I2C_DATA = devAddr | 1u;
             regs->REG_I2C_CNT  = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_START;
-            i2cWaitBusy(regs);
+            if (!i2cWaitBusy(regs))
+                return false;
             if (!I2C_GET_ACK(regs->REG_I2C_CNT)) {
                 regs->REG_I2C_CNT =
                     I2C_ENABLE | I2C_IRQ_ENABLE | I2C_ERROR | I2C_STOP;
@@ -98,6 +107,8 @@ static bool i2cStartTransfer(I2cDevice devId, uint8_t regAddr, bool read,
 }
 
 bool I2C_writeReg(I2cDevice devId, uint8_t regAddr, uint8_t data) {
+    if ((unsigned)devId >= sizeof(i2cDevTable) / sizeof(i2cDevTable[0]))
+        return false;
     I2cRegs *const regs = i2cGetBusRegsBase(i2cDevTable[devId].busId);
 
     if (!i2cStartTransfer(devId, regAddr, false, regs))
@@ -105,13 +116,17 @@ bool I2C_writeReg(I2cDevice devId, uint8_t regAddr, uint8_t data) {
 
     regs->REG_I2C_DATA = data;
     regs->REG_I2C_CNT  = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIRE_WRITE | I2C_STOP;
-    i2cWaitBusy(regs);
+    if (!i2cWaitBusy(regs))
+        return false;
 
     return I2C_GET_ACK(regs->REG_I2C_CNT);
 }
 
 bool I2C_readRegBuf(I2cDevice devId, uint8_t regAddr, uint8_t *out,
                     uint32_t size) {
+    if ((unsigned)devId >= sizeof(i2cDevTable) / sizeof(i2cDevTable[0]) ||
+        (size && !out))
+        return false;
     if (size == 0)
         return true;
 
@@ -123,12 +138,14 @@ bool I2C_readRegBuf(I2cDevice devId, uint8_t regAddr, uint8_t *out,
     /* All but the last byte: read and ACK to request the next one. */
     while (--size) {
         regs->REG_I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIRE_READ | I2C_ACK;
-        i2cWaitBusy(regs);
+        if (!i2cWaitBusy(regs))
+            return false;
         *out++ = regs->REG_I2C_DATA;
     }
     /* Last byte: NAK + stop. */
     regs->REG_I2C_CNT = I2C_ENABLE | I2C_IRQ_ENABLE | I2C_DIRE_READ | I2C_STOP;
-    i2cWaitBusy(regs);
+    if (!i2cWaitBusy(regs))
+        return false;
     *out = regs->REG_I2C_DATA;
 
     return true;

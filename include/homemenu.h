@@ -36,5 +36,7 @@ void home_reload(const HomeApp *apps, int n);
 void home_draw(void);
 /* The menu's loop; never returns. */
 void home_run(void);
+/* Power-off/reboot menu. `home_context` redraws the Home Menu on cancel. */
+void home_system_menu(int home_context);
 
 #endif
