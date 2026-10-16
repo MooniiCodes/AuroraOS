@@ -1798,8 +1798,8 @@ static void clamp_date(UserConfig *cfg) {
     cfg->birth_month = 12;
   if (cfg->birth_year < 1900)
     cfg->birth_year = 1900;
-  if (cfg->birth_year > 2050)
-    cfg->birth_year = 2050;
+  if (cfg->birth_year > 2025)
+    cfg->birth_year = 2025;
 }
 
 static void date_box(int x, int y, const char *label, u32 val, int digits,
