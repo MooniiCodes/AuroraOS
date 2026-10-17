@@ -125,7 +125,7 @@ static void mode_apply(void) {
 
 void plat_notes(char *out, int size) {
   if (!g_n3ds)
-    snprintf(out, (size_t)size, "Old 3DS: 268 MHz");
+    snprintf(out, (size_t)size, "Old 3DS/2DS: 268 MHz");
   else if (g_sysm)
     snprintf(out, (size_t)size, "%s", mode_text[g_mode]);
   else
@@ -213,7 +213,7 @@ int main(void) {
            (unsigned long)GET_VERSION_MINOR(kv),
            (unsigned long)GET_VERSION_REVISION(kv));
   pi.system = system;
-  pi.model = g_n3ds ? "New 3DS family" : "Old 3DS family";
+  pi.model = g_n3ds ? "New 3DS/2DS family" : "Old 3DS/2DS family";
 
   stress_main(&pi);
 

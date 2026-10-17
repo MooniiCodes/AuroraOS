@@ -188,7 +188,7 @@
 #define ASSET_FONT_TITLE                 182u
 
 #define ASSET_COUNT 183u
-#define ASSET_ARENA_NEEDED 717568u
+#define ASSET_ARENA_NEEDED 723968u
 #define ASSET_MAX_CSIZE 72035u
 
 #endif

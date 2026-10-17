@@ -206,6 +206,8 @@ void delay(volatile u32 cycles);
 void power_off(void);
 u32  get_keys(void);
 u32  get_keys_down(void);
+u32  get_keys_physical_down(void);
+void set_cpad_nav_enabled(int enabled);
 void set_brightness(u32 level);
 
 #endif

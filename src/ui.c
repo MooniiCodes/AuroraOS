@@ -47,10 +47,11 @@ void ui_init(void) {
   ui_assets = assets_load();
   if (!ui_assets)
     return;
-  asset_font(ASSET_FONT_SMALL, &ui_small);
-  asset_font(ASSET_FONT_UI, &ui_font);
-  asset_font(ASSET_FONT_BOLD, &ui_bold);
-  asset_font(ASSET_FONT_TITLE, &ui_title);
+  if (!asset_font(ASSET_FONT_SMALL, &ui_small) ||
+      !asset_font(ASSET_FONT_UI, &ui_font) ||
+      !asset_font(ASSET_FONT_BOLD, &ui_bold) ||
+      !asset_font(ASSET_FONT_TITLE, &ui_title))
+    ui_assets = 0;
 }
 
 int ui_have(const Font *f) { return ui_assets && f->head != 0; }

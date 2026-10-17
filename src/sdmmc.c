@@ -2,6 +2,9 @@
 
 static mmcdevice handleSD;
 
+#define SDMMC_CMD_TIMEOUT 20000000u
+#define SDMMC_INIT_ATTEMPTS 100u
+
 static void sdmmc_wait_ms(u32 ms) {
     while (ms--)
         delay(40000);
@@ -35,8 +38,14 @@ static void sdmmc_send_command(mmcdevice *ctx, u32 cmd, u32 args) {
         flags |= TMIO_STAT0_DATAEND;
 
     ctx->error = 0;
-    while (sdmmc_read16(REG_SDSTATUS1) & TMIO_STAT1_CMD_BUSY)
-        ; /* wait for the controller to be idle */
+    u32 timeout;
+    for (timeout = 0; timeout < SDMMC_CMD_TIMEOUT; timeout++)
+        if (!(sdmmc_read16(REG_SDSTATUS1) & TMIO_STAT1_CMD_BUSY))
+            break;
+    if (timeout == SDMMC_CMD_TIMEOUT) {
+        ctx->error |= 4;
+        return;
+    }
     sdmmc_write16(REG_SDIRMASK0, 0);
     sdmmc_write16(REG_SDIRMASK1, 0);
     sdmmc_write16(REG_SDSTATUS0, 0);
@@ -57,7 +66,7 @@ static void sdmmc_send_command(mmcdevice *ctx, u32 cmd, u32 args) {
     bool tUseBuf = (NULL != tDataPtr32);
 
     u16 status0 = 0;
-    while (1) {
+    for (timeout = 0; timeout < SDMMC_CMD_TIMEOUT; timeout++) {
         volatile u16 status1 = sdmmc_read16(REG_SDSTATUS1);
         volatile u16 ctl32 = sdmmc_read16(REG_DATACTL32);
         if (ctl32 & 0x100) { /* RX32RDY: a block is waiting in the FIFO */
@@ -116,10 +125,18 @@ static void sdmmc_send_command(mmcdevice *ctx, u32 cmd, u32 args) {
                 break;
         }
     }
+    if (timeout == SDMMC_CMD_TIMEOUT)
+        ctx->error |= 4;
     ctx->stat0 = sdmmc_read16(REG_SDSTATUS0);
     ctx->stat1 = sdmmc_read16(REG_SDSTATUS1);
     sdmmc_write16(REG_SDSTATUS0, 0);
     sdmmc_write16(REG_SDSTATUS1, 0);
+
+    if (ctx->error & 4) {
+        if (readdata || writedata)
+            sdmmc_write16(REG_SDSTOP, 0x100);
+        return;
+    }
 
     if (getSDRESP) {
         ctx->ret[0] = sdmmc_read16(REG_SDRESP0) | (sdmmc_read16(REG_SDRESP1) << 16);
@@ -204,13 +221,24 @@ static int SD_Init(void) {
     u32 temp = (handleSD.error & 0x1) << 0x1E;
 
     u32 temp2 = 0;
-    do {
-        do {
-            sdmmc_send_command(&handleSD, 0x10437, handleSD.initarg << 0x10); /* CMD55 */
-            sdmmc_send_command(&handleSD, 0x10769, 0x10100000 | temp);        /* ACMD41 */
+    for (u32 attempt = 0; attempt < SDMMC_INIT_ATTEMPTS; attempt++) {
+        sdmmc_send_command(&handleSD, 0x10437,
+                           handleSD.initarg << 0x10); /* CMD55 */
+        if (handleSD.error & 4)
+            return -12;
+        sdmmc_send_command(&handleSD, 0x10769,
+                           0x10100000 | temp); /* ACMD41 */
+        if (handleSD.error & 4)
+            return -12;
+        if ((handleSD.error & 1) &&
+            (handleSD.ret[0] & 0x80000000)) {
             temp2 = 1;
-        } while (!(handleSD.error & 1));
-    } while ((handleSD.ret[0] & 0x80000000) == 0); /* wait until powered up */
+            break;
+        }
+        sdmmc_wait_ms(10);
+    }
+    if (!temp2)
+        return -12;
 
     if (!((handleSD.ret[0] >> 30) & 1) || !temp)
         temp2 = 0;

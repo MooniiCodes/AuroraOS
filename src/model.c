@@ -85,11 +85,11 @@ void aurora_n3ds_clock(u32 *before, u32 *after) {
 
 const char *aurora_n3ds_hw_text(AuroraN3dsHw r) {
   switch (r) {
-    case AURORA_N3DS_HW_APPLIED: return "New 3DS: fast clock mode on";
-    case AURORA_N3DS_HW_ALREADY: return "New 3DS: fast clock was already on";
-    case AURORA_N3DS_HW_REFUSED: return "New 3DS: clock switch did not take";
-    case AURORA_N3DS_HW_NO_CORE: return "New 3DS: ARM11 core did not answer";
-    case AURORA_N3DS_HW_NO_IRQ:  return "New 3DS: no wake-up IRQ, not switched";
-    default:                     return "Old 3DS: standard clock";
+    case AURORA_N3DS_HW_APPLIED: return "New 3DS/2DS: fast clock mode on";
+    case AURORA_N3DS_HW_ALREADY: return "New 3DS/2DS: fast clock was already on";
+    case AURORA_N3DS_HW_REFUSED: return "New 3DS/2DS: clock switch did not take";
+    case AURORA_N3DS_HW_NO_CORE: return "New 3DS/2DS: ARM11 core did not answer";
+    case AURORA_N3DS_HW_NO_IRQ:  return "New 3DS/2DS: no wake-up IRQ, not switched";
+    default:                     return "Old 3DS/2DS: standard clock";
   }
 }
