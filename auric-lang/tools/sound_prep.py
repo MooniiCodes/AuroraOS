@@ -39,7 +39,6 @@ def read_wav(path):
         raise ValueError('only 8/16/24-bit PCM, mono or stereo')
 
     frames = len(body) // align
-    width = bits // 8
     if bits == 16:
         raw = array('h')
         raw.frombytes(body[:frames * align])
@@ -50,10 +49,10 @@ def read_wav(path):
     elif bits == 8:
         raw = body
         scale = 128.0
-        get = lambda i: raw[i] - 128
+        def get(i): return raw[i] - 128
     else:
         scale = 8388608.0
-        get = lambda i: int.from_bytes(body[i * 3:i * 3 + 3], 'little', signed=True)
+        def get(i): return int.from_bytes(body[i * 3:i * 3 + 3], 'little', signed=True)
 
     out = array('d', bytes(8 * frames))
     for f in range(frames):

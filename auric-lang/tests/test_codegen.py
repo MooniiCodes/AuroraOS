@@ -49,7 +49,8 @@ class CodeGenTest(unittest.TestCase):
         self.assertIn("float au_f = 1.5f;", c)
 
     def test_if_else(self):
-        c = compile_to_c("fn main() { if true { clear(BLACK); } else { clear(WHITE); } }")
+        c = compile_to_c(
+            "fn main() { if true { clear(BLACK); } else { clear(WHITE); } }")
         self.assertIn("if (1) {", c)
         self.assertIn("} else {", c)
 

@@ -97,7 +97,7 @@ class BuildTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "Hello.bin"
             aurcc.build([str(SDK / "examples" / "hello")], out,
-                         build_dir=Path(d) / "build")
+                        build_dir=Path(d) / "build")
             data = out.read_bytes()
         magic, off, size, load, entry = struct.unpack("<4sIIII", data[:20])
         self.assertEqual(magic, b"AURC")

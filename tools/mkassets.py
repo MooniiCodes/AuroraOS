@@ -8,10 +8,14 @@ Usage:
     python tools/mkassets.py [-o Aurora/assets.pak] [--header include/asset_ids.h]
 """
 
-import argparse, os, struct, sys
+import ttf
+import png_read
+import argparse
+import os
+import struct
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import png_read, ttf
 
 PAK_VERSION = 1
 T_ALPHA8, T_RGBA, T_FONT = 0, 1, 2
@@ -226,12 +230,15 @@ def unrle(data, usize):
     out = bytearray()
     i = 0
     while i < len(data) and len(out) < usize:
-        c = data[i]; i += 1
+        c = data[i]
+        i += 1
         if c & 0x80:
             k = c & 0x7F
-            out += data[i:i + k]; i += k
+            out += data[i:i + k]
+            i += k
         else:
-            out += bytes((data[i],)) * c; i += 1
+            out += bytes((data[i],)) * c
+            i += 1
     return out
 
 
@@ -380,8 +387,11 @@ def main():
         f.write('#define ASSET_MAX_CSIZE %du\n\n#endif\n' % max_csize)
 
     raw = sum(len(e[4]) for e in entries)
-    print('%s: %d assets, %d bytes on disk (%d decoded, %.0f%% saved)'
-          % (a.out, len(entries), len(out), arena, 100.0 * (1 - len(blob) / float(raw))))
+    print(
+        '%s: %d assets, %d bytes on disk (%d decoded, %.0f%% saved)'
+        % (a.out, len(entries), len(out), arena,
+           100.0 * (1 - len(blob) / float(raw)))
+    )
     print('%s: ASSET_COUNT=%d ASSET_ARENA_NEEDED=%d' % (a.header, len(ids), arena))
 
 

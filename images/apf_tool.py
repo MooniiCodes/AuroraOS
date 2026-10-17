@@ -55,7 +55,8 @@ def decode(apf_path: Path) -> Image.Image:
 
     width, height, pixel_format, _reserved = struct.unpack("<HHBB", data[4:HEADER_SIZE])
     if pixel_format not in (FORMAT_RGB, FORMAT_RGBA):
-        raise ValueError(f"{apf_path} has an unrecognized pixel format ({pixel_format}).")
+        raise ValueError(
+            f"{apf_path} has an unrecognized pixel format ({pixel_format}).")
 
     mode = "RGBA" if pixel_format == FORMAT_RGBA else "RGB"
     channels = 4 if pixel_format == FORMAT_RGBA else 3
@@ -72,17 +73,23 @@ def decode(apf_path: Path) -> Image.Image:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Convert to/from the custom .apf image format.")
+    parser = argparse.ArgumentParser(
+        description="Convert to/from the custom .apf image format.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_convert = sub.add_parser("convert", help="Convert a PNG/JPEG to .apf")
     p_convert.add_argument("input", type=Path, help="Source .png or .jpg/.jpeg file")
-    p_convert.add_argument("output", type=Path, nargs="?", help="Output .apf path (default: same name, .apf extension)")
-    p_convert.add_argument("--alpha", action="store_true", help="Keep the alpha channel (RGBA instead of RGB)")
+    p_convert.add_argument("output", type=Path, nargs="?",
+                           help="Output .apf path (default: same name, .apf extension)")
+    p_convert.add_argument("--alpha", action="store_true",
+                           help="Keep the alpha channel (RGBA instead of RGB)")
 
     p_open = sub.add_parser("open", help="Open/view a .apf file")
     p_open.add_argument("input", type=Path, help="Source .apf file")
-    p_open.add_argument("--save", type=Path, help="Save as a normal image (e.g. output.png) instead of displaying it")
+    p_open.add_argument(
+        "--save", type=Path,
+        help="Save as a normal image (e.g. output.png) instead of displaying it",
+    )
 
     args = parser.parse_args()
 
