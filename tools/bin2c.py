@@ -15,7 +15,7 @@ def main() -> None:
     out.append(f"static const unsigned int {name}_len = {len(data)};")
     out.append(f"static const unsigned char {name}[] = {{")
     for i in range(0, len(data), 12):
-        chunk = data[i : i + 12]
+        chunk = data[i: i + 12]
         out.append("  " + "".join(f"0x{b:02x}," for b in chunk))
     out.append("};")
     sys.stdout.write("\n".join(out) + "\n")

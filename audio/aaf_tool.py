@@ -8,7 +8,9 @@ HEADER_FORMAT = "<4sBBBBII"
 HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
 
 
-def convert_to_aaf(input_path: str, output_path: str, sample_rate: int, bit_depth: int = 16):
+def convert_to_aaf(
+    input_path: str, output_path: str, sample_rate: int, bit_depth: int = 16
+):
     from pydub import AudioSegment
     from pydub.utils import which
 
@@ -17,11 +19,13 @@ def convert_to_aaf(input_path: str, output_path: str, sample_rate: int, bit_dept
     have_ffmpeg = which("ffmpeg") is not None or which("avconv") is not None
     if ext != ".wav" and not have_ffmpeg:
         raise SystemExit(
-            f"ffmpeg is required to read '{ext or input_path}' files, but it was not\n"
+            f"ffmpeg is required to read '{ext or input_path}' files, "
+            "but it was not\n"
             "found on your PATH. Fix it one of these ways:\n"
             "  * Install ffmpeg, then reopen your terminal:\n"
             "      winget install Gyan.FFmpeg      (or)   choco install ffmpeg\n"
-            "  * Or convert the source to .wav first and pass that (WAV needs no ffmpeg)."
+            "  * Or convert the source to .wav first and pass that "
+            "(WAV needs no ffmpeg)."
         )
 
     print(f"Loading {input_path} ...")
@@ -29,8 +33,10 @@ def convert_to_aaf(input_path: str, output_path: str, sample_rate: int, bit_dept
         audio = AudioSegment.from_file(input_path)
     except FileNotFoundError:
         raise SystemExit(
-            "Could not launch ffmpeg (needed to decode this file). Install it with\n"
-            "  winget install Gyan.FFmpeg   (then reopen the terminal), or use a .wav input."
+            "Could not launch ffmpeg (needed to decode this file). "
+            "Install it with\n"
+            "  winget install Gyan.FFmpeg   (then reopen the terminal), "
+            "or use a .wav input."
         )
 
     print(f"Converting to mono, {sample_rate} Hz, {bit_depth}-bit ...")
@@ -58,7 +64,9 @@ def convert_to_aaf(input_path: str, output_path: str, sample_rate: int, bit_dept
 
     orig_size = Path(input_path).stat().st_size
     new_size = Path(output_path).stat().st_size
-    print(f"Wrote {output_path} ({new_size:,} bytes, was {orig_size:,} bytes)")
+    print(
+        f"Wrote {output_path} ({new_size:,} bytes, was {orig_size:,} bytes)"
+    )
 
 
 def read_aaf(path: str):
@@ -67,9 +75,10 @@ def read_aaf(path: str):
         if len(header_bytes) < HEADER_SIZE:
             raise ValueError("File too small to be a valid .aaf file")
 
-        magic, version, channels, bit_depth, _reserved, sample_rate, num_samples = struct.unpack(
-            HEADER_FORMAT, header_bytes
-        )
+        (
+            magic, version, channels, bit_depth, _reserved, sample_rate,
+            num_samples,
+        ) = struct.unpack(HEADER_FORMAT, header_bytes)
 
         if magic != MAGIC:
             raise ValueError(f"Not a valid .aaf file (bad magic: {magic!r})")
@@ -108,7 +117,8 @@ def main():
     parser = argparse.ArgumentParser(description="Convert to / play .aaf audio files")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    convert_parser = subparsers.add_parser("convert", help="Convert an audio file to .aaf")
+    convert_parser = subparsers.add_parser(
+        "convert", help="Convert an audio file to .aaf")
     convert_parser.add_argument("input", help="Input audio file (mp3, wav, etc.)")
     convert_parser.add_argument("output", help="Output .aaf file path")
     convert_parser.add_argument(

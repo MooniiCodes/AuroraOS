@@ -25,5 +25,6 @@ class AuricError(Exception):
     def format(self) -> str:
         where = ""
         if self.line:
-            where = f" (line {self.line}" + (f", col {self.col}" if self.col else "") + ")"
+            where = f" (line {self.line}" + \
+                (f", col {self.col}" if self.col else "") + ")"
         return f"{self.stage} error{where}: {self.message}"

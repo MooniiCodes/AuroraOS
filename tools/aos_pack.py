@@ -77,7 +77,8 @@ def pack(
         )
     if _overlaps(arm11_load, arm11_size, LOADER_ARM11_RANGE):
         print(
-            f"warning: ARM11 payload [{arm11_load:#010x}..{arm11_load + arm11_size:#010x}] "
+            f"warning: ARM11 payload "
+            f"[{arm11_load:#010x}..{arm11_load + arm11_size:#010x}] "
             f"overlaps the loader's ARM11 region {LOADER_ARM11_RANGE[0]:#010x}.."
             f"{LOADER_ARM11_RANGE[1]:#010x}",
             file=sys.stderr,
@@ -157,7 +158,8 @@ def main() -> None:
 
     p_pack = sub.add_parser("pack", help="Build an AOS1 container")
     p_pack.add_argument("arm9", type=Path, help="ARM9 payload binary")
-    p_pack.add_argument("arm11", type=Path, nargs="?", help="ARM11 payload binary (optional)")
+    p_pack.add_argument("arm11", type=Path, nargs="?",
+                        help="ARM11 payload binary (optional)")
     p_pack.add_argument("-o", "--output", type=Path, default=Path("aurora_os.bin"),
                         help="Output file (default: aurora_os.bin)")
     p_pack.add_argument("--arm9-load", type=_auto, default=DEFAULT_ARM9_LOAD,
@@ -176,8 +178,16 @@ def main() -> None:
 
     try:
         if args.command == "pack":
-            arm9_entry = args.arm9_entry if args.arm9_entry is not None else args.arm9_load
-            arm11_entry = args.arm11_entry if args.arm11_entry is not None else args.arm11_load
+            arm9_entry = (
+                args.arm9_entry
+                if args.arm9_entry is not None
+                else args.arm9_load
+            )
+            arm11_entry = (
+                args.arm11_entry
+                if args.arm11_entry is not None
+                else args.arm11_load
+            )
             pack(args.arm9, args.arm11, args.output,
                  args.arm9_load, arm9_entry, args.arm11_load, arm11_entry)
         elif args.command == "info":

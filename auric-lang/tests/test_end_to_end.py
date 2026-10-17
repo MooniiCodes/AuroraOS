@@ -6,6 +6,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 AURIC_ROOT = Path(__file__).resolve().parents[1]
@@ -48,6 +49,51 @@ class PackTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 aur_pack.pack(payload, Path(d) / "o.bin", 0x22000000,
                               0x22000000, b"AUR1")
+
+    def test_info_rejects_truncated_payload(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "bad.bin"
+            path.write_bytes(struct.pack(
+                aur_pack.HEADER_FMT, b"AUR1", 36, 64, 0x22000000,
+                0x22000000, 0, 0, 0, 0) + b"\0")
+            with self.assertRaisesRegex(ValueError, "past end"):
+                aur_pack.info(path)
+
+    def test_info_rejects_payload_inside_header(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "bad.bin"
+            path.write_bytes(struct.pack(
+                aur_pack.HEADER_FMT, b"AUR1", 32, 4, 0x22000000,
+                0x22000000, 0, 0, 0, 0) + b"\0" * 4)
+            with self.assertRaisesRegex(ValueError, "inside the header"):
+                aur_pack.info(path)
+
+    def test_info_rejects_inconsistent_arm11_metadata(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "bad.bin"
+            path.write_bytes(struct.pack(
+                aur_pack.HEADER_FMT, b"AUR1", 36, 1, 0x22000000,
+                0x22000000, 0, 0, 0x25100000, 0) + b"\0")
+            with self.assertRaisesRegex(ValueError, "ARM11 metadata"):
+                aur_pack.info(path)
+
+    def test_auric_run_sets_empty_temp_variables(self):
+        captured = {}
+
+        def fake_run(cmd, **kwargs):
+            captured.update(kwargs)
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch.dict(aurc.os.environ,
+                             {"TMPDIR": "", "TMP": "", "TEMP": ""},
+                             clear=False), \
+                mock.patch.object(aurc.subprocess, "run", side_effect=fake_run):
+            aurc._run(["fake-tool"], verbose=False)
+
+        expected = str(aurc.tempfile.gettempdir())
+        self.assertEqual(captured["env"]["TMPDIR"], expected)
+        self.assertEqual(captured["env"]["TMP"], expected)
+        self.assertEqual(captured["env"]["TEMP"], expected)
 
 
 @unittest.skipUnless(HAVE_GCC, "arm-none-eabi-gcc not on PATH")

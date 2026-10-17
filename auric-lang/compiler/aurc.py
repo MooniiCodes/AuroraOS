@@ -9,9 +9,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 # Runs both as a module and as a script.
@@ -73,7 +75,8 @@ INSTALL_HINT = (
     "Auric needs an ARM cross-compiler (devkitARM is the standard choice for\n"
     "3DS homebrew). Install devkitPro/devkitARM and make sure its bin directory\n"
     "is on PATH, e.g. C:\\devkitPro\\devkitARM\\bin (Windows) or\n"
-    "/opt/devkitpro/devkitARM/bin (Unix). See https://devkitpro.org/wiki/Getting_Started"
+    "/opt/devkitpro/devkitARM/bin (Unix). See "
+    "https://devkitpro.org/wiki/Getting_Started"
 )
 
 # AuroraOS's ARM9 flags (Makefile), plus -ffunction-sections/-fdata-sections so
@@ -106,7 +109,12 @@ def _find_tool(name: str) -> str:
 def _run(cmd: list[str], verbose: bool) -> None:
     if verbose:
         print("  $ " + " ".join(cmd))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    env = dict(os.environ)
+    tmp = tempfile.gettempdir()
+    for var in ("TMPDIR", "TMP", "TEMP"):
+        if not env.get(var):
+            env[var] = tmp
+    proc = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if proc.returncode != 0:
         out = (proc.stdout + proc.stderr).strip()
         raise BuildError(f"command failed ({proc.returncode}): {' '.join(cmd)}\n{out}")
@@ -166,12 +174,18 @@ def compile_file(src_path: Path, output: Path, *, build_dir: Path,
     # The icon header, program, runtime and the AuroraOS sources an app links.
     _run([cc, *ARM9_ASFLAGS, *includes, "-c", str(head_s), "-o", str(head_o)], verbose)
     _run([cc, *ARM9_CFLAGS, *includes, "-c", str(gen_c), "-o", str(prog_o)], verbose)
-    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(RUNTIME_C), "-o", str(runtime_o)], verbose)
-    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(RUNTIME_NET), "-o", str(net_o)], verbose)
-    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_SCREEN), "-o", str(screen_o)], verbose)
-    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_I2C), "-o", str(i2c_o)], verbose)
-    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_GPU9), "-o", str(gpu9_o)], verbose)
-    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_TOUCH9), "-o", str(touch9_o)], verbose)
+    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(RUNTIME_C),
+          "-o", str(runtime_o)], verbose)
+    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(RUNTIME_NET),
+          "-o", str(net_o)], verbose)
+    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_SCREEN),
+          "-o", str(screen_o)], verbose)
+    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_I2C),
+          "-o", str(i2c_o)], verbose)
+    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_GPU9),
+          "-o", str(gpu9_o)], verbose)
+    _run([cc, *ARM9_CFLAGS, *includes, "-c", str(AURORA_TOUCH9),
+          "-o", str(touch9_o)], verbose)
     for src, obj in zip(AURORA_SOUND + AURORA_NET, sound_o + netlib_o):
         _run([cc, *ARM9_CFLAGS, *includes, "-c", str(src), "-o", str(obj)], verbose)
     _run([cc, *ARM9_ASFLAGS, "-c", str(RUNTIME_START), "-o", str(start_o)], verbose)
@@ -190,7 +204,7 @@ def compile_file(src_path: Path, output: Path, *, build_dir: Path,
 
     if not keep:
         for f in (head_o, head_s, prog_o, runtime_o, screen_o, i2c_o, gpu9_o,
-                  touch9_o, start_o, elf, payload, *sound_o):
+                  touch9_o, start_o, elf, payload, net_o, *sound_o, *netlib_o):
             f.unlink(missing_ok=True)
 
     return output

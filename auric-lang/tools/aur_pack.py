@@ -98,6 +98,20 @@ def info(path: Path) -> None:
         arm11_entry,
     ) = struct.unpack(HEADER_FMT, data[:HEADER_SIZE])
 
+    ranges = [("ARM9", arm9_offset, arm9_size)]
+    if arm11_size:
+        ranges.append(("ARM11", arm11_offset, arm11_size))
+    for name, offset, size in ranges:
+        if offset < HEADER_SIZE:
+            raise ValueError(f"{name} payload starts inside the header")
+        if offset + size > len(data):
+            raise ValueError(f"{name} payload runs past end of file")
+    if arm11_size == 0 and any((arm11_offset, arm11_load, arm11_entry)):
+        raise ValueError("ARM11 metadata is nonzero without an ARM11 payload")
+    if arm11_size and arm9_offset < arm11_offset + arm11_size and \
+            arm11_offset < arm9_offset + arm9_size:
+        raise ValueError("ARM9 and ARM11 payloads overlap")
+
     print(f"{path}: {magic.decode('ascii', 'replace')} container, {len(data)} bytes")
     print(f"  ARM9 : offset {arm9_offset:#x}  size {arm9_size}  "
           f"load {arm9_load:#010x}  entry {arm9_entry:#010x}")
@@ -106,9 +120,6 @@ def info(path: Path) -> None:
               f"load {arm11_load:#010x}  entry {arm11_entry:#010x}")
     else:
         print("  ARM11: (none)")
-
-    if arm9_offset + arm9_size > len(data):
-        print("  ERROR: ARM9 payload runs past end of file", file=sys.stderr)
 
 
 def _auto(value: str) -> int:
@@ -141,14 +152,20 @@ def main() -> None:
                         help="Container magic: AUR1 (default) or AOS1 (for a "
                              "drop-in boot test on the unmodified loader)")
 
-    p_info = sub.add_parser("info", help="Print the header of an AUR1/AOS1 container")
+    p_info = sub.add_parser(
+        "info", help="Print the header of an AUR1/AOS1 container"
+    )
     p_info.add_argument("input", type=Path, help="Container file to inspect")
 
     args = parser.parse_args()
 
     try:
         if args.command == "pack":
-            arm9_entry = args.arm9_entry if args.arm9_entry is not None else args.arm9_load
+            arm9_entry = (
+                args.arm9_entry
+                if args.arm9_entry is not None
+                else args.arm9_load
+            )
             pack(args.arm9, args.output, args.arm9_load, arm9_entry, args.magic)
         elif args.command == "info":
             info(args.input)

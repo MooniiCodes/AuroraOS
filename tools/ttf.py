@@ -67,9 +67,12 @@ class Font(object):
         seg2 = struct.unpack('>H', d[best + 6:best + 8])[0]
         seg = seg2 // 2
         p = best + 14
-        self.cmap_end = struct.unpack('>%dH' % seg, d[p:p + seg2]); p += seg2 + 2
-        self.cmap_start = struct.unpack('>%dH' % seg, d[p:p + seg2]); p += seg2
-        self.cmap_delta = struct.unpack('>%dh' % seg, d[p:p + seg2]); p += seg2
+        self.cmap_end = struct.unpack('>%dH' % seg, d[p:p + seg2])
+        p += seg2 + 2
+        self.cmap_start = struct.unpack('>%dH' % seg, d[p:p + seg2])
+        p += seg2
+        self.cmap_delta = struct.unpack('>%dh' % seg, d[p:p + seg2])
+        p += seg2
         self.cmap_range_off_pos = p
         self.cmap_range_off = struct.unpack('>%dH' % seg, d[p:p + seg2])
         self.cmap_segs = seg
@@ -83,7 +86,8 @@ class Font(object):
                 ro = self.cmap_range_off[i]
                 if ro == 0:
                     return (c + self.cmap_delta[i]) & 0xFFFF
-                pos = self.cmap_range_off_pos + i * 2 + ro + (c - self.cmap_start[i]) * 2
+                pos = self.cmap_range_off_pos + i * 2 + \
+                    ro + (c - self.cmap_start[i]) * 2
                 g = struct.unpack('>H', self.data[pos:pos + 2])[0]
                 return (g + self.cmap_delta[i]) & 0xFFFF if g else 0
         return 0
@@ -105,34 +109,42 @@ class Font(object):
             return self._composite(base + 10, depth)
 
         p = base + 10
-        ends = struct.unpack('>%dH' % ncont, d[p:p + ncont * 2]); p += ncont * 2
+        ends = struct.unpack('>%dH' % ncont, d[p:p + ncont * 2])
+        p += ncont * 2
         npts = ends[-1] + 1 if ncont else 0
-        ilen = struct.unpack('>H', d[p:p + 2])[0]; p += 2 + ilen
+        ilen = struct.unpack('>H', d[p:p + 2])[0]
+        p += 2 + ilen
 
         flags = []
         while len(flags) < npts:
-            f = d[p]; p += 1
+            f = d[p]
+            p += 1
             flags.append(f)
             if f & 8:
-                r = d[p]; p += 1
+                r = d[p]
+                p += 1
                 flags.extend([f] * r)
         flags = flags[:npts]
 
         xs, v = [], 0
         for f in flags:
             if f & 2:
-                dx = d[p]; p += 1
+                dx = d[p]
+                p += 1
                 v += dx if f & 16 else -dx
             elif not (f & 16):
-                v += struct.unpack('>h', d[p:p + 2])[0]; p += 2
+                v += struct.unpack('>h', d[p:p + 2])[0]
+                p += 2
             xs.append(v)
         ys, v = [], 0
         for f in flags:
             if f & 4:
-                dy = d[p]; p += 1
+                dy = d[p]
+                p += 1
                 v += dy if f & 32 else -dy
             elif not (f & 32):
-                v += struct.unpack('>h', d[p:p + 2])[0]; p += 2
+                v += struct.unpack('>h', d[p:p + 2])[0]
+                p += 2
             ys.append(v)
 
         out, s = [], 0
@@ -146,20 +158,29 @@ class Font(object):
             return []
         d, out = self.data, []
         while True:
-            flags, gi = struct.unpack('>HH', d[p:p + 4]); p += 4
+            flags, gi = struct.unpack('>HH', d[p:p + 4])
+            p += 4
             if flags & 1:
-                a1, a2 = struct.unpack('>hh', d[p:p + 4]); p += 4
+                a1, a2 = struct.unpack('>hh', d[p:p + 4])
+                p += 4
             else:
-                a1, a2 = struct.unpack('>bb', d[p:p + 2]); p += 2
+                a1, a2 = struct.unpack('>bb', d[p:p + 2])
+                p += 2
             sx = sy = 1.0
             s01 = s10 = 0.0
             if flags & 8:
-                sx = sy = _f2dot14(d, p); p += 2
+                sx = sy = _f2dot14(d, p)
+                p += 2
             elif flags & 0x40:
-                sx = _f2dot14(d, p); sy = _f2dot14(d, p + 2); p += 4
+                sx = _f2dot14(d, p)
+                sy = _f2dot14(d, p + 2)
+                p += 4
             elif flags & 0x80:
-                sx = _f2dot14(d, p); s01 = _f2dot14(d, p + 2)
-                s10 = _f2dot14(d, p + 4); sy = _f2dot14(d, p + 6); p += 8
+                sx = _f2dot14(d, p)
+                s01 = _f2dot14(d, p + 2)
+                s10 = _f2dot14(d, p + 4)
+                sy = _f2dot14(d, p + 6)
+                p += 8
             dx, dy = (a1, a2) if flags & 2 else (0, 0)
             for c in self.contours(gi, depth + 1):
                 out.append([(x * sx + y * s10 + dx, x * s01 + y * sy + dy, on)
@@ -303,7 +324,8 @@ def _flatten(contour, scale):
                 u = 1.0 - t
                 qx = u * u * cx + 2 * u * t * px + t * t * nx
                 qy = u * u * cy + 2 * u * t * py + t * t * ny
-                segs.append((cx, cy, qx, qy) if s == 1 else (segs[-1][2], segs[-1][3], qx, qy))
+                segs.append((cx, cy, qx, qy) if s == 1 else (
+                    segs[-1][2], segs[-1][3], qx, qy))
             cx, cy = nx, ny
             i += 2
     if (cx, cy) != start:
