@@ -254,12 +254,11 @@ The descriptor's "ready" magic gates this: an app **booted directly** as
 `AURORAOS.BIN` (via the firm, with no OS behind it) finds no valid descriptor and
 ignores HOME, so nothing branches into an uninstalled stub.
 
-> In Auric, HOME is polled from every built-in call, so any loop that draws or
-> reads input keeps it responsive. Because reading the MCU costs a full I2C
-> transaction and a game can call built-ins hundreds of times per frame, the
-> poll is sampled every 64 calls rather than on each one; blocking calls such
-> as `wait_key` poll on every iteration instead. A loop that calls no built-in
-> at all will not respond to HOME.
+> Auric checks HOME during built-in calls at least every 12 ms; blocking calls
+> such as `wait_key` check on every iteration. This timer-based cadence keeps
+> the short MCU press event from being skipped by apps that make few built-in
+> calls per frame. A loop that calls no built-in at all will not respond to
+> HOME.
 
 ### After a crash
 

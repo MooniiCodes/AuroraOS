@@ -106,6 +106,14 @@ static void save(void) { fs_write_file(path, &state, sizeof(state)); }
 atexit(save);
 ```
 
+Pressing L + Down + Select opens Aurora's system menu in apps launched from
+the Home Menu. The resident ARM11 system service owns the chord and draws the
+overlay independently of the app's input and rendering loops. Updated C
+runtimes hide pad input from the app while the menu is open. Return to Home is
+delivered to this runtime at SDK boundaries, so rebuild existing `.bin` files
+with `sdk/aurcc.py` to include the return-request handler. Power off and Cancel
+are handled by the resident service itself.
+
 HOME is noticed in `app_loop()`, `hid_scan()`, `hid_wait()` and `sys_sleep()`;
 a long computation that calls none of them does not respond to it until it
 does.
@@ -309,6 +317,7 @@ The tool's own tests: `py sdk/tests/test_aurcc.py` (the build test runs when
 | [`examples/demo`](examples/demo/main.c) | a tour: shapes, all fonts, a ball the circle pad pushes, the clock and battery, painting with the stylus, **X** saves the picture as a BMP with stdio; `sprite.png` and `bounce.wav` in its data folder are used when there |
 | [`examples/bricks`](examples/bricks/main.c) | a breakout game: D-pad, circle pad or touch; the best score saved through `atexit()`; optional `paddle.wav`, `brick.wav`, `lost.wav` |
 | [`examples/net`](examples/net/main.c) | the network: joins with a spinner from `net_on_wait()`, fetches a page (A), pings a host (Y), downloads the page into its data folder (X) |
+| [`examples/system_menu`](examples/system_menu/main.c) | checks L + Down + Select while the app uses Down and Select for gameplay |
 
 ```
 py sdk/aurcc.py build sdk/examples/bricks -o Bricks.bin

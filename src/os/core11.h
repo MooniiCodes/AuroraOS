@@ -110,6 +110,15 @@ void wifi11_net(uint32_t op);
 void gpu11_run(void);
 /* Leaves framebuffer A on screen, for whatever runs on the panels next. */
 void gpu11_show_a(void);
+/* The resident system menu draws in a hidden bottom framebuffer, then swaps
+ * it in while it runs and restores the application's last frame on exit. */
+int gpu11_menu_frame(void);
+void gpu11_menu_show(int frame);
+void gpu11_menu_restore(void);
+
+/* Resident ARM11 system-menu service. Polling is independent of app input and
+ * runs even when an app does not call its C/Auric runtime. */
+void system_menu11_poll(void);
 
 /* Keeps the New 3DS barrier's polarity alternating while it is in use; call
  * it often (Stereo11.c times it). */

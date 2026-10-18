@@ -111,6 +111,7 @@ static void core11_park(AudioCtrl *ct) {
 void audio11_main(void) {
   AudioCtrl *ct = (AudioCtrl *)AUDIO_CTRL_ADDR;
   int poll_tick = 0;
+  int menu_tick = 0;
 
   ct->status = AUDIO_ST_BOOT;
   ct->ack_seq = ct->cmd_seq;
@@ -133,6 +134,13 @@ void audio11_main(void) {
   touch11_init();
 
   for (;;) {
+    /* The system menu lives on this core and is not part of either app
+     * runtime. Poll before taking a pending command so an app waiting for a
+     * present is held at a clean call boundary while the overlay is open. */
+    if (++menu_tick >= 16) {
+      menu_tick = 0;
+      system_menu11_poll();
+    }
     dcache_inval_line((const void *)&ct->cmd_seq);
     if (ct->cmd_seq != ct->ack_seq) {
       dcache_clean_inval(); /* a command is here: pull everything it needs */

@@ -1213,46 +1213,43 @@ static void power_ask(void) {
   back_home();
 }
 
-enum { SYS_POWER_OFF, SYS_REBOOT, SYS_CANCEL, SYS_COUNT };
+enum { SYS_HOME, SYS_POWER_OFF, SYS_CANCEL, SYS_COUNT };
 
-#define SYS_ROW_Y(i) (MN_Y + 72 + (i) * 42)
+static int navigation_requested;
 
-static void system_menu_draw(int selected, int home_context) {
+int home_navigation_requested(void) { return navigation_requested; }
+
+void home_navigation_clear(void) { navigation_requested = 0; }
+
+static void system_menu_draw(int selected) {
   volatile u8 *fb = VRAM_BOT_A;
-  static const Color scrim = {0x00, 0x00, 0x00};
+  static const Color black = {0x00, 0x00, 0x00};
+  static const Color cyan = {0x64, 0xE8, 0xC8};
   static const StringId labels[SYS_COUNT] = {
-      STR_POWER_OFF, STR_REBOOT, STR_CANCEL};
+      STR_RETURN_HOME, STR_POWER_OFF, STR_CANCEL};
+  const char *title = "Aurore Tools";
 
-  if (home_context) {
-    menu_card(L(STR_SYSTEM), L(STR_SYSTEM_MENU_HINT));
-  } else {
-    draw_filled_rect_alpha(fb, 0, 0, BW, BSH, BSH, scrim, 150);
-    draw_gradient_round_rect(fb, MN_X, MN_Y, MN_W, MN_H, 14, BSH,
-                             COLOR_PANEL_TOP, COLOR_PANEL_BOT);
-    ui_text_mid_fit(fb, BW / 2, MN_Y + 12, BSH, L(STR_SYSTEM), MN_W - 28,
-                    COLOR_WHITE, COLOR_PANEL_TOP, &ui_bold);
-    ui_text_mid_fit(fb, BW / 2, MN_Y + 36, BSH, L(STR_SYSTEM_MENU_HINT),
-                    MN_W - 28, COLOR_HM_TEXT2, COLOR_PANEL_TOP, &ui_small);
-  }
+  clear_screen(fb, BOT_FB_SIZE, black);
+  ui_text(fb, 8, 8, BSH, title, cyan, black, &ui_small);
   for (int i = 0; i < SYS_COUNT; i++) {
-    int y = SYS_ROW_Y(i);
+    int y = 32 + i * 16;
     if (i == selected)
-      draw_filled_round_rect(fb, MN_X + 20, y - 3, MN_W - 40, 36, 10, BSH,
-                             g_accent);
-    draw_gradient_round_rect(fb, MN_X + 23, y, MN_W - 46, 30, 8, BSH,
-                             COLOR_HM_SLOT_TOP, COLOR_HM_SLOT_BOT);
-    ui_text_mid_fit(fb, BW / 2, y + (30 - ui_th(&ui_bold)) / 2, BSH,
-                    L(labels[i]), MN_W - 64, COLOR_WHITE, COLOR_HM_SLOT,
-                    &ui_bold);
+      ui_text(fb, 8, y, BSH, ">", cyan, black, &ui_small);
+    ui_text(fb, 28, y, BSH, L(labels[i]), COLOR_WHITE, black, &ui_small);
   }
+  ui_text(fb, 8, BSH - 16, BSH, "A: Select   B: Close", cyan, black,
+          &ui_small);
   screen_present_bottom();
 }
 
-void home_system_menu(int home_context) {
-  int selected = SYS_POWER_OFF;
+void home_system_menu(void) {
+  int selected = SYS_HOME;
+  static u32 saved_bottom[BOT_FB_SIZE / 4];
+  volatile u32 *bottom = (volatile u32 *)VRAM_BOT_A;
+  for (u32 i = 0; i < BOT_FB_SIZE / 4; i++)
+    saved_bottom[i] = bottom[i];
 
-  anim_popup(MN_X, MN_Y, MN_W, MN_H);
-  system_menu_draw(selected, home_context);
+  system_menu_draw(selected);
   for (;;) {
     u32 k = get_keys_down();
     int tx, ty, next = selected, chosen = -1;
@@ -1261,30 +1258,23 @@ void home_system_menu(int home_context) {
     if (k & BUTTON_DDOWN)
       next = selected + 1 < SYS_COUNT ? selected + 1 : 0;
     if (touch_tap(&tx, &ty)) {
-      if (!touch_in(tx, ty, MN_X, MN_Y, MN_W, MN_H))
-        break;
       for (int i = 0; i < SYS_COUNT; i++)
-        if (touch_in(tx, ty, MN_X + 20, SYS_ROW_Y(i) - 3, MN_W - 40, 36))
+        if (touch_in(tx, ty, 20, 28 + i * 16, BW - 40, 16))
           chosen = i;
     }
     if (k & BUTTON_A)
       chosen = selected;
     if (k & BUTTON_B)
       break;
+    if (chosen == SYS_HOME) {
+      navigation_requested = 1;
+      break;
+    }
     if (chosen == SYS_POWER_OFF) {
       if (fv_confirm(L(STR_POWER_ASK), "", L(STR_POWER_OFF), L(STR_CANCEL)))
         power_shutdown();
       else {
-        system_menu_draw(selected, home_context);
-        continue;
-      }
-      break;
-    }
-    if (chosen == SYS_REBOOT) {
-      if (fv_confirm(L(STR_REBOOT_ASK), "", L(STR_REBOOT), L(STR_CANCEL)))
-        power_reboot();
-      else {
-        system_menu_draw(selected, home_context);
+        system_menu_draw(selected);
         continue;
       }
       break;
@@ -1293,13 +1283,15 @@ void home_system_menu(int home_context) {
       break;
     if (next != selected) {
       selected = next;
-      system_menu_draw(selected, home_context);
+      system_menu_draw(selected);
     }
     ui_idle();
   }
-  anim_transition(ANIM_FADE, ANIM_BOT);
-  if (home_context)
-    back_home();
+  if (!navigation_requested) {
+    for (u32 i = 0; i < BOT_FB_SIZE / 4; i++)
+      bottom[i] = saved_bottom[i];
+    screen_present_bottom();
+  }
 }
 
 static void button(int b) {
@@ -1565,14 +1557,13 @@ void home_run(void) {
       hk->tick();
     k = get_keys_down();
 
-    /* A chord outside normal navigation opens the system power menu. */
-    {
-      const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
-      if ((get_keys() & chord) == chord &&
-          (get_keys_physical_down() & chord)) {
-        home_system_menu(1);
-        continue;
-      }
+    /* A system menu opened from a nested screen keeps sending Back until
+     * that screen returns here; then restore the Home Menu and clear the
+     * request so normal navigation resumes. */
+    if (home_navigation_requested()) {
+      home_navigation_clear();
+      back_home();
+      continue;
     }
 
     if (held != HL_NONE) {

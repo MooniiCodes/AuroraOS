@@ -1,5 +1,6 @@
 #include "anim.h"
 #include "gpu.h"
+#include "homemenu.h"
 #include "timer.h"
 
 extern void os_dcache_flush(void);
@@ -365,6 +366,9 @@ void anim_gpu_start(void) {
 
 void anim_transition(int kind, int screens) {
   if (!gpu_on)
+    return;
+  /* Unwind nested screens immediately after the system menu's Home action. */
+  if (kind == ANIM_POP && home_navigation_requested())
     return;
   xf[0].state = xf[1].state = 0; /* the frames are about to be reused */
   if (!tr_kind) {

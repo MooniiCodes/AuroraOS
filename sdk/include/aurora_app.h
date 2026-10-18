@@ -21,8 +21,9 @@
  *     return 0;
  *   }
  *
- * Returning from main(), calling exit() or pressing HOME goes back to the
- * Home Menu. Build with sdk/aurcc.py; see sdk/README.md. */
+ * Returning from main(), calling exit() or pressing HOME goes back to the Home
+ * Menu. L + Down + Select opens the system menu in an app. Build with
+ * sdk/aurcc.py; see sdk/README.md. */
 #ifndef AURORA_APP_H
 #define AURORA_APP_H
 
@@ -34,7 +35,7 @@
 extern "C" {
 #endif
 
-#define AURORA_SDK_VERSION "1.1"
+#define AURORA_SDK_VERSION "1.2"
 
 #define AURORA_PRINTF(fmt, args) __attribute__((format(printf, fmt, args)))
 
@@ -51,8 +52,8 @@ typedef int64_t s64;
 
 /* One pass of a frame loop: shows what was drawn since the last call, waits
  * for the next frame (60 per second), then reads the buttons, touch and
- * circle pad. HOME goes back to the Home Menu from here. Returns false once
- * app_quit() has been called.
+ * circle pad. HOME goes back to the Home Menu; L + Down + Select opens the
+ * system menu. Returns false once app_quit() has been called.
  *
  *   while (app_loop()) { read input, update, draw }                       */
 bool app_loop(void);

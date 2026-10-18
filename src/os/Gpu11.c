@@ -319,6 +319,7 @@ static const Panel panels[2] = {
 
 static uint32_t mode[2];              /* GPU_VSYNC_* */
 static int shown[2], before[2];       /* framebuffers, 0 A to 2 C */
+static int menu_saved_bottom = -1;
 
 /* The top panel's right eye for each of A/B/C: the left framebuffer itself
  * for a 2D frame, its GPU_FB_TOP_R* twin for a stereo one. */
@@ -563,6 +564,32 @@ void gpu11_show_a(void) {
     panels_to_a(g);
     dcache_clean();
   }
+}
+
+int gpu11_menu_frame(void) {
+  if (menu_saved_bottom >= 0)
+    return -1;
+  menu_saved_bottom = shown[1];
+  return (shown[1] + 1) % 3;
+}
+
+void gpu11_menu_show(int frame) {
+  GpuShared *g = (GpuShared *)GPU_SHARED_ADDR;
+  if (menu_saved_bottom < 0 || frame < 0 || frame > 2)
+    return;
+  show(1, frame);
+  set_front(g, 1);
+  dcache_clean();
+}
+
+void gpu11_menu_restore(void) {
+  GpuShared *g = (GpuShared *)GPU_SHARED_ADDR;
+  if (menu_saved_bottom < 0)
+    return;
+  show(1, menu_saved_bottom);
+  set_front(g, 1);
+  menu_saved_bottom = -1;
+  dcache_clean();
 }
 
 void gpu11_run(void) {

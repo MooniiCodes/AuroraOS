@@ -87,7 +87,6 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_A_APPLY_B_BACK*/
     {"A: Apply   B: Back", "A: Aplicar  B: Atr\u00E1s", "A: Appliquer B: Retour"},
     /* STR_POWER_OFF    */ {"Power Off", "Apagar", "\u00C9teindre"},
-    /* STR_REBOOT       */ {"Reboot", "Reiniciar", "Red\u00E9marrer"},
     /* STR_SYSTEM       */ {"System", "Sistema", "Syst\u00E8me"},
     /* STR_EMPTY_SLOT   */ {"Empty Slot", "Vac\u00EDo", "Vide"},
     /* STR_LOADING      */ {"Loading...", "Cargando...", "Chargement..."},
@@ -166,6 +165,8 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_MINUTE       */ {"Minute", "Minuto", "Minute"},
     /* STR_FOLDER       */ {"Folder", "Carpeta", "Dossier"},
     /* STR_HOME         */ {"Home", "Inicio", "Accueil"},
+    /* STR_RETURN_HOME  */ {"Return to Home", "Volver al inicio",
+                            "Retourner à l'accueil"},
     /* STR_ITEM         */ {"item", "elemento", "\u00E9l\u00E9ment"},
     /* STR_ITEMS        */ {"items", "elementos", "\u00E9l\u00E9ments"},
     /* STR_MOVE         */ {"Move", "Mover", "D\u00E9placer"},
@@ -181,13 +182,6 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_POWER_ASK    */
     {"Turn off the console?", "\u00BFApagar la consola?",
      "\u00C9teindre la console ?"},
-    /* STR_REBOOT_ASK   */
-    {"Reboot the console?", "\u00BFReiniciar la consola?",
-     "Red\u00E9marrer la console ?"},
-    /* STR_SYSTEM_MENU_HINT */
-    {"D-Pad: choose   A: select   B: back",
-     "D-Pad: elegir   A: aceptar   B: volver",
-     "D-Pad: choisir   A : valider   B : retour"},
     /* STR_REMOVE_ASK   */
     {"Remove this folder?", "\u00BFQuitar esta carpeta?",
      "Retirer ce dossier ?"},
@@ -1313,15 +1307,6 @@ static void bottom_title(const char *s) {
           COLOR_HM_BG, &ui_small);
 }
 
-static int setup_power_chord(u32 k) {
-  const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
-  if ((get_keys() & chord) != chord ||
-      !(get_keys_physical_down() & chord) || !(k & chord))
-    return 0;
-  home_system_menu(0);
-  return 1;
-}
-
 static void glow_top(void) {
   clear_screen(VRAM_TOP_LA, TOP_FB_SIZE, COLOR_HM_BG);
   int cx = TOP_SCREEN_WIDTH / 2, cy = 95;
@@ -1409,10 +1394,6 @@ static void step_language(UserConfig *cfg) {
   lang_bottom(sel, accent);
   while (1) {
     u32 k = get_keys_down();
-    if (setup_power_chord(k)) {
-      lang_bottom(sel, accent);
-      continue;
-    }
     int prev = sel;
     if ((k & BUTTON_DUP) && sel > 0)
       sel--;
@@ -1493,10 +1474,6 @@ static Nav step_network(UserConfig *cfg) {
   net_draw(sel, saved, accent);
   while (1) {
     u32 k = get_keys_down();
-    if (setup_power_chord(k)) {
-      net_draw(sel, saved, accent);
-      continue;
-    }
     int prev = sel, go = 0, tx, ty;
     if (k & BUTTON_DUP)
       sel = 0;
@@ -1688,10 +1665,6 @@ int keyboard_edit(char *name, int size, int mode, const char *hint,
   kb_draw(name, row, col, caps, accent);
   while (1) {
     u32 k = get_keys_down();
-    if (setup_power_chord(k)) {
-      kb_draw(name, row, col, caps, accent);
-      continue;
-    }
     int changed = 0;
     int orow = row, ocol = col, ocaps = caps, olen = len;
 
@@ -1906,10 +1879,6 @@ static Nav step_user(UserConfig *cfg) {
   user_bottom(cfg, focus, accent);
   while (1) {
     u32 k = get_keys_down();
-    if (setup_power_chord(k)) {
-      user_bottom(cfg, focus, accent);
-      continue;
-    }
     int redraw = 0, full = 0, old_focus = focus;
 
     if (k & BUTTON_DLEFT) {
@@ -2035,10 +2004,6 @@ static Nav step_account(UserConfig *cfg) {
   acct_draw(sel, accent);
   while (1) {
     u32 k = get_keys_down();
-    if (setup_power_chord(k)) {
-      acct_draw(sel, accent);
-      continue;
-    }
     int prev = sel, go = 0, tx, ty;
     if (k & BUTTON_DUP)
       sel = 0;
@@ -2124,12 +2089,6 @@ static Nav step_personalise(UserConfig *cfg) {
   accent_bottom(sel);
   while (1) {
     u32 k = get_keys_down();
-    if (setup_power_chord(k)) {
-      setup_top(4, L(STR_PERS_L1), 0, aurora_accent_presets[sel]);
-      screen_present_top();
-      accent_bottom(sel);
-      continue;
-    }
     int prev = sel;
     int col = sel % PCOLS, row = sel / PCOLS;
     if ((k & BUTTON_DLEFT) && col > 0)
@@ -2209,10 +2168,6 @@ static Nav step_welcome(UserConfig *cfg) {
 
   while (1) {
     u32 k = get_keys_down();
-    if (setup_power_chord(k)) {
-      welcome_draw(accent);
-      continue;
-    }
     int tx, ty;
     if (touch_tap(&tx, &ty))
       return NAV_NEXT;

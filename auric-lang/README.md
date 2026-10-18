@@ -109,10 +109,17 @@ python -m compiler.aurc build examples/hello.aur -o AURORAOS.BIN
 > magic. If you are running an *older* AuroraOS build, use `--magic AOS1`; the
 > `AUR1` and `AOS1` files are byte-identical apart from those four magic bytes.
 >
-> **Press HOME to return** to the Aurora home menu at any time, the runtime
-> polls the HOME button inside every built-in, and the Home Menu restores itself
-> when you press it. (This works for apps launched from the home menu; an app
-> booted directly as `AURORAOS.BIN` has no menu to return to, so it ignores HOME.)
+> **Press HOME to return** to the Aurora home menu at any time. Apps launched
+> from the Home Menu also open the resident Aurora system menu with
+> L + Down + Select. The ARM11 service displays it independently; Return to
+> Home is handled by the Auric runtime when it next reaches a built-in or
+> returns from a core service call. Updated Auric programs also stop receiving
+> pad input while the menu is visible. Rebuild existing apps with this runtime
+> to include those handlers. An app booted directly as `AURORAOS.BIN` has no menu to
+> return to, so both shortcuts are ignored. Returning from `main()` also quits
+> to Home. See
+> [`examples/system_menu.aur`](examples/system_menu.aur) for a
+> demo that uses Down and Select in its own controls.
 
 ## Standalone Windows executable (`aurc.exe`)
 

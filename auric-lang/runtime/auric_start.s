@@ -20,6 +20,7 @@ _start:
     blt   .Lbss
 
     bl    au_main                @ Auric `fn main`
+    bl    aur_app_return         @ a normal return quits to the Home Menu
 
 .Lhang:
     b     .Lhang

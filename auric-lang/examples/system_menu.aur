@@ -1,0 +1,43 @@
+// Exercises the system-menu shortcut while the app consumes Down and Select.
+let down_presses = 0;
+let left_presses = 0;
+let select_presses = 0;
+
+fn main() {
+    buffered(true);
+    while true {
+        let keys = keys_down();
+        if (keys & KEY_DOWN) != 0 {
+            down_presses = down_presses + 1;
+        }
+        if (keys & KEY_LEFT) != 0 {
+            left_presses = left_presses + 1;
+        }
+        if (keys & KEY_SELECT) != 0 {
+            select_presses = select_presses + 1;
+        }
+        if (keys & KEY_B) != 0 {
+            break;
+        }
+
+        screen(TOP);
+        clear(BLACK);
+        print("System menu test - Auric", 24, 20, AURORA);
+        print("Press L + Down + Select", 24, 52, WHITE);
+        print("Down and Select are used by this app.", 24, 72, GRAY);
+        print("Down presses:", 24, 120, WHITE);
+        print_int(down_presses, 160, 120, AURORA);
+        print("Left presses:", 24, 144, WHITE);
+        print_int(left_presses, 160, 144, AURORA);
+        print("Select presses:", 24, 168, WHITE);
+        print_int(select_presses, 160, 168, AURORA);
+
+        screen(BOTTOM);
+        clear(DARK_GRAY);
+        print("AuroraOS Auric runtime", 18, 38, AURORA);
+        print("L + Down + Select opens the system menu.", 18, 72, WHITE);
+        print("Cancel returns here; Return to Home exits.", 18, 96, WHITE);
+        print("HOME or B returns to Aurora Home.", 18, 164, GRAY);
+        present();
+    }
+}

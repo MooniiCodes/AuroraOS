@@ -129,6 +129,7 @@ void app_gfx_direct(bool on) {
 u32 app_present(void) {
   u32 d = g_dirty;
 
+  app_hid_home_menu_poll();
   g_dirty = 0;
   if (!d)
     return 0;
@@ -139,6 +140,7 @@ u32 app_present(void) {
     g_blit_src = 0;
     if (gpu_present2_async((u32)VRAM_TOP_BACK, (u32)VRAM_BOT_BACK)) {
       gpu_wait_idle();
+      app_hid_home_menu_poll();
       return d;
     }
   }
@@ -146,6 +148,7 @@ u32 app_present(void) {
     screen_present_top();
   if (d & 2u)
     screen_present_bottom();
+  app_hid_home_menu_poll();
   return d;
 }
 

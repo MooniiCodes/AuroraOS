@@ -17,6 +17,7 @@
 .equ RET_DESC_ADDR, 0x25008000   @ [magic, os_image_size]
 .equ OS_SNAPSHOT,   0x26000000   @ saved OS image
 .equ OS_LOAD_ADDR,  0x22000000   @ where the OS runs / its entry (_os_start)
+.equ SYSMENU_CTRL,  0x233A8000   @ resident ARM11 system-menu control block
 
 /* Whole-cache clean+invalidate by index (ARM946E-S: 4 KB, 4 ways, 32-byte
  * lines). */
@@ -72,6 +73,21 @@ os_cache_sync:
  * which relocation does not change. */
 .type os_return_stub, %function
 os_return_stub:
+    @ Stop the resident ARM11 hotkey before the OS image is restored. The
+    @ control fields occupy separate 32-byte cache lines (active, visible,
+    @ action).
+    ldr   r5, =SYSMENU_CTRL
+    mov   r6, #0
+    str   r6, [r5]
+    mcr   p15, 0, r5, c7, c10, 1  @ publish app_active = 0
+    add   r5, r5, #32
+    str   r6, [r5]
+    mcr   p15, 0, r5, c7, c10, 1  @ publish menu_open = 0
+    add   r5, r5, #32
+    str   r6, [r5]
+    mcr   p15, 0, r5, c7, c10, 1  @ clear a stale Home request
+    mov   r5, #0
+    mcr   p15, 0, r5, c7, c10, 4
     ldr   r4, =RET_DESC_ADDR
     ldr   r2, [r4, #4]                @ OS image size in bytes
     ldr   r0, =OS_SNAPSHOT            @ src

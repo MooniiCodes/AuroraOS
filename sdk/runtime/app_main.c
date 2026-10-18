@@ -83,8 +83,10 @@ void app_core_post(u32 cmd, u32 a0, u32 a1, u32 a2, u32 a3) {
   os_dcache_clean_range((const void *)&ct->cmd_seq, sizeof(u32));
   for (u32 spin = 0; spin < 2000000u; spin++) {
     inval_line(&ct->ack_seq);
-    if (ct->ack_seq == ct->cmd_seq)
+    if (ct->ack_seq == ct->cmd_seq) {
+      app_hid_home_menu_poll();
       return;
+    }
   }
 }
 
@@ -100,17 +102,19 @@ void audio_error_beep(void) {
 
 /* HOME is not on the HID pad: the MCU reports it in its interrupt flags,
  * which reading register 0x10 also clears. Bit 2 of the first byte is a HOME
- * press. */
+ * press. Poll the SDK system-menu chord alongside it. */
 bool app_home_pressed(void) {
+  if (app_hid_system_menu_open())
+    return false; /* the resident menu must release the core before exit */
   u8 irq[4];
-  if (!I2C_readRegBuf(I2C_DEV_MCU, 0x10, irq, sizeof(irq)))
-    return false;
-  return (irq[0] & 0x04) != 0;
+  return I2C_readRegBuf(I2C_DEV_MCU, 0x10, irq, sizeof(irq)) &&
+         (irq[0] & 0x04) != 0;
 }
 
 void app_poll_home(void) {
   if (g_app_leaving || !app_from_home())
     return;
+  app_hid_home_menu_poll();
   if (app_home_pressed())
     exit(0);
 }
@@ -227,6 +231,9 @@ bool app_loop(void) {
   u32 now;
   u32 shown;
 
+  /* Check before a potentially blocking present as well as after input scan;
+   * HOME is a short MCU event and an app can spend time drawing between frames. */
+  app_poll_home();
   app_flush_stdout();
   shown = app_present();
   if (!g_frame_ticks)

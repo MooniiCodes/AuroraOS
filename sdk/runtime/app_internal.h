@@ -6,6 +6,7 @@
 #define AURORA_APP_INTERNAL_H
 
 #include "aurora.h"
+#include "system_menu.h"
 #define AURORA_APP_NO_COLORS
 #include "aurora_app.h"
 
@@ -16,6 +17,8 @@
 extern bool g_app_leaving;
 bool app_core(void);
 bool app_home_pressed(void);
+bool app_hid_system_menu_open(void);
+void app_hid_home_menu_poll(void);
 /* Leaves through exit() when HOME was pressed. */
 void app_poll_home(void);
 void app_leave(int code) __attribute__((noreturn));
