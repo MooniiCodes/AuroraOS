@@ -19,6 +19,7 @@
 /* Offset of the clock offset (Settings > Clock): minutes as a little-endian
  * int16. Older files have zeros here, which is no offset. */
 #define USER_DAT_CLOCK    49
+#define USER_DAT_BRIGHTNESS 51
 
 enum {
   LANG_ENGLISH = 0,
@@ -41,6 +42,7 @@ typedef struct {
   u8   touch_set;     /* touch holds a measured calibration */
   TouchCal touch;
   s16  clock_offset;  /* minutes added to the RTC; see g_rtc_offset */
+  u8   brightness;    /* 0..4, applied by the ARM11 LCD driver */
 } UserConfig;
 
 void user_config_defaults(UserConfig *cfg);

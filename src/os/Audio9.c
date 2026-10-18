@@ -175,6 +175,12 @@ void audio_voices_stop(void) {
   post_wait(AUDIO_CMD_VOICE_STOP, AUDIO_VOICE_ALL);
 }
 
+void audio_set_brightness(uint32_t level) {
+  if (level > 4u) level = 4u;
+  if (audio_alive())
+    post_wait(AUDIO_CMD_BRIGHTNESS, level);
+}
+
 void audio_play_pcm(uint32_t samples, uint32_t rate, uint32_t depth) {
   os_cache_sync(); /* flush the caller's PCM writes at AUDIO_PCM_ADDR to RAM */
   ctrl->cmd = AUDIO_CMD_PCM;

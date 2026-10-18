@@ -2282,6 +2282,7 @@ void user_config_defaults(UserConfig *cfg) {
   cfg->touch_set = 0;
   touch_cal_default(&cfg->touch);
   cfg->clock_offset = 0;
+  cfg->brightness = 3;
 }
 
 static s16 get16(const u8 *p) { return (s16)(p[0] | (p[1] << 8)); }
@@ -2336,6 +2337,8 @@ int user_config_load(UserConfig *cfg) {
     if (cfg->clock_offset <= -1440 || cfg->clock_offset >= 1440)
       cfg->clock_offset = 0;
   }
+  if (br > USER_DAT_BRIGHTNESS && s_buf[USER_DAT_BRIGHTNESS] <= 4)
+    cfg->brightness = s_buf[USER_DAT_BRIGHTNESS];
 
   if (cfg->language >= LANG_COUNT)
     cfg->language = LANG_ENGLISH;
@@ -2368,6 +2371,7 @@ int user_config_save(const UserConfig *cfg) {
   for (int i = 0; i < USER_NAME_MAX; i++)
     s_buf[12 + i] = (u8)cfg->name[i];
   put16(s_buf + USER_DAT_CLOCK, cfg->clock_offset);
+  s_buf[USER_DAT_BRIGHTNESS] = cfg->brightness <= 4 ? cfg->brightness : 3;
   if (cfg->touch_set) {
     u8 *t = s_buf + USER_DAT_TOUCH;
     t[0] = 1;

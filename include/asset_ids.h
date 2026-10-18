@@ -179,16 +179,17 @@
 #define ASSET_PERSON_DISLOPIK_40         173u
 #define ASSET_PERSON_STAR_40             174u
 #define ASSET_PERSON_ATEXBG_40           175u
-#define ASSET_PERSON_KYAERO_40           176u
-#define ASSET_PERSON_SECRET_40           177u
-#define ASSET_WALLPAPER                  178u
-#define ASSET_FONT_SMALL                 179u
-#define ASSET_FONT_UI                    180u
-#define ASSET_FONT_BOLD                  181u
-#define ASSET_FONT_TITLE                 182u
+#define ASSET_PERSON_SAIITANAA_40        176u
+#define ASSET_PERSON_KYAERO_40           177u
+#define ASSET_PERSON_SECRET_40           178u
+#define ASSET_WALLPAPER                  179u
+#define ASSET_FONT_SMALL                 180u
+#define ASSET_FONT_UI                    181u
+#define ASSET_FONT_BOLD                  182u
+#define ASSET_FONT_TITLE                 183u
 
-#define ASSET_COUNT 183u
-#define ASSET_ARENA_NEEDED 717568u
+#define ASSET_COUNT 184u
+#define ASSET_ARENA_NEEDED 723968u
 #define ASSET_MAX_CSIZE 72035u
 
 #endif
