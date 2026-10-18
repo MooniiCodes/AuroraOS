@@ -98,6 +98,8 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_STOPPED      */ {"Stopped", "Detenido", "Arr\u00EAt\u00E9"},
     /* STR_DEBUG_CRASH  */
     {"Force Debug Crash", "Forzar Fallo", "Forcer un Crash"},
+    /* STR_RESET */
+    {"Reset", "Reiniciar", "R\\u00E9initialiser"},
     /* STR_WIFI_TEST    */ {"Wi-Fi Test", "Prueba de Wi-Fi", "Test Wi-Fi"},
     /* STR_GPU_TEST     */ {"GPU Test", "Prueba de GPU", "Test GPU"},
     /* STR_VERSION      */ {"Version", "Versi\u00F3n", "Version"},
@@ -1097,6 +1099,17 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_ABOUT_SCROLL_HINT */ {"D-pad / swipe: scroll   B: back",
                                  "D-pad / deslizar: mover   B: volver",
                                  "Fl\u00E8ches / glisser : d\u00E9filer   B : retour"},
+    /* STR_RESET_ASK */ {"Reset Aurora settings?", "\u00BFAjustes de Aurora?",
+                         "R\u00E9initialiser Aurora ?"},
+    /* STR_RESET_HINT */ {"A: Delete USER.dat   B: Cancel",
+                          "A: Borrar USER.dat   B: Cancelar",
+                          "A : Effacer USER.dat   B : Annuler"},
+    /* STR_RESET_DONE */ {"USER.dat deleted. Restart Aurora.",
+                          "USER.dat borrado. Reinicia Aurora.",
+                          "USER.dat supprim\u00E9. Red\u00E9marrez Aurora."},
+    /* STR_RESET_FAILED */ {"Could not delete USER.dat",
+                            "No se pudo borrar USER.dat",
+                            "Impossible de supprimer USER.dat"},
 };
 
 const char *L(StringId id) {

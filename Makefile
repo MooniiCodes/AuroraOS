@@ -6,6 +6,7 @@ CC         := $(PREFIX)gcc
 AS         := $(PREFIX)gcc
 LD         := $(PREFIX)gcc
 OBJCOPY    := $(PREFIX)objcopy
+PYTHON     ?= python3
 # devkitPro's msys python is usually first on PATH and lacks firmtool, so use
 # the first Python that can import it. Override with FIRMTOOL=... if needed.
 FIRMTOOL_PY = $(firstword $(foreach p,python py python3 C:/Python314/python.exe,$(if $(shell $(p) -c "import firmtool" >/dev/null 2>&1 && echo y),$(p))))
@@ -127,7 +128,7 @@ $(BUILD_DIR)/arm11_%.o: $(SRC_DIR)/%.s
 
 # Rebuilds Aurora/assets.pak from icons/ and assets/fonts/.
 assets:
-	python tools/mkassets.py -v
+	$(PYTHON) tools/mkassets.py -v
 
 
 clean:
@@ -215,7 +216,7 @@ $(AUDIO11_BIN): $(BUILD_DIR)/audio11.elf
 
 $(AUDIO11_BLOB): $(AUDIO11_BIN)
 	@echo [BLOB] Embedding $< '->' $@
-	python tools/bin2c.py $< audio11_bin > $@
+	$(PYTHON) tools/bin2c.py $< audio11_bin > $@
 
 $(BUILD_DIR)/os_audio9.o: $(OS_DIR)/Audio9.c $(wildcard $(INC_DIR)/*.h) $(AUDIO11_BLOB) | dirs
 	@echo [CC9 ] Compiling $< '(for OS)'
@@ -276,7 +277,7 @@ PICASSO ?= $(if $(DEVKITPRO),$(DEVKITPRO)/tools/bin/picasso,picasso)
 $(BUILD_DIR)/model_shbin.h: $(OS_DIR)/model.v.pica tools/shbin2c.py | dirs
 	@echo [PICA] Assembling $<
 	$(PICASSO) -o $(BUILD_DIR)/model.shbin $<
-	python tools/shbin2c.py $(BUILD_DIR)/model.shbin model_shader > $@
+	$(PYTHON) tools/shbin2c.py $(BUILD_DIR)/model.shbin model_shader > $@
 
 $(BUILD_DIR)/os_model3d.o: $(OS_DIR)/Model3D.c $(wildcard $(INC_DIR)/*.h) $(BUILD_DIR)/model_shbin.h | dirs
 	@echo [CC9 ] Compiling $< '(for OS)'
@@ -427,12 +428,12 @@ os: $(OS_OBJS)
 	$(LD) -T $(OS_LD) -nostdlib -nostartfiles -Wl,--build-id=none -Wl,--gc-sections $(OS_OBJS) -o $(BUILD_DIR)/os.elf -lgcc
 	$(OBJCOPY) -O binary $(BUILD_DIR)/os.elf $(BUILD_DIR)/os.bin
 	@echo [PACK] Packing AURORAOS.BIN
-	python tools/aos_pack.py pack $(BUILD_DIR)/os.bin -o AURORAOS.BIN --arm9-load 0x22000000
+	$(PYTHON) tools/aos_pack.py pack $(BUILD_DIR)/os.bin -o AURORAOS.BIN --arm9-load 0x22000000
 	@echo "  -> AURORAOS.BIN (copy this to the SD card root)"
 
 greentest: dirs
 	$(AS) $(ARM9_ASFLAGS) -c tools/testpayload/payload.s -o $(BUILD_DIR)/payload.o
 	$(LD) -T tools/testpayload/payload.ld -nostdlib -nostartfiles -Wl,--build-id=none $(BUILD_DIR)/payload.o -o $(BUILD_DIR)/payload.elf
 	$(OBJCOPY) -O binary $(BUILD_DIR)/payload.elf $(BUILD_DIR)/payload.bin
-	python tools/aos_pack.py pack $(BUILD_DIR)/payload.bin -o greentest.bin --arm9-load 0x22000000
+	$(PYTHON) tools/aos_pack.py pack $(BUILD_DIR)/payload.bin -o greentest.bin --arm9-load 0x22000000
 	@echo "  -> greentest.bin"

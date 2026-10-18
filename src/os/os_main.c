@@ -215,6 +215,7 @@ typedef enum {
   SET_GPUTEST,
   SET_ABOUT,
   SET_CRASH,
+  SET_RESET,
   SET_COUNT
 } SettingId;
 
@@ -285,6 +286,9 @@ static void settings_content(int id, u32 *asset, const unsigned char **icon,
     case SET_ABOUT:
       *asset = ASSET_ICON_INFO_32;
       *icon = icon_settings_bits; *name = L(STR_ABOUT); *value = AURORA_VERSION; break;
+    case SET_RESET:
+      *asset = ASSET_ICON_SETTINGS_32;
+      *icon = icon_power_bits; *name = L(STR_RESET); *value = ""; break;
     default: /* SET_CRASH */
       *asset = ASSET_ICON_REPORT_32;
       *icon = icon_power_bits; *name = L(STR_DEBUG_CRASH); *value = ""; break;
@@ -2699,6 +2703,47 @@ static void touch_cal_screen(void) {
 
 static void account_open(void) { account_screen(g_cfg.name); }
 
+static void reset_screen(void) {
+  int confirmed = 0;
+  ui_wallpaper(VRAM_BOT_A, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT,
+               BOT_SCREEN_HEIGHT);
+  ui_dialog(VRAM_BOT_A, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT, BOT_SCREEN_HEIGHT,
+            L(STR_RESET_ASK), L(STR_RESET_HINT), g_accent, 0);
+  screen_present_bottom();
+  while (!confirmed) {
+    u32 k = get_keys_down();
+    if (k & BUTTON_B)
+      return;
+    if (k & BUTTON_A)
+      confirmed = 1;
+    else
+      ui_idle();
+  }
+
+  FATFS fs;
+  FRESULT fr = f_mount(&fs, "", 1);
+  if (fr == FR_OK) {
+    fr = f_unlink(USER_DAT_PATH);
+    f_mount(NULL, "", 0);
+    if (fr == FR_OK)
+      g_cfg.setup_done = 0;
+  }
+  ui_wallpaper(VRAM_BOT_A, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT,
+               BOT_SCREEN_HEIGHT);
+  ui_dialog(VRAM_BOT_A, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT, BOT_SCREEN_HEIGHT,
+            L(fr == FR_OK ? STR_RESET : STR_RESET_FAILED),
+            fr == FR_OK ? L(STR_RESET_DONE) : L(STR_RESET_FAILED), g_accent,
+            0);
+  screen_present_bottom();
+  for (;;) {
+    int tx, ty;
+    u32 k = get_keys_down();
+    if ((k & (BUTTON_A | BUTTON_B)) || touch_tap(&tx, &ty))
+      return;
+    ui_idle();
+  }
+}
+
 static void settings_open(void) {
   wifi_saved_load();
   account_load();
@@ -2747,6 +2792,7 @@ static void settings_open(void) {
         case SET_GPUTEST:  sub = gpu_test_screen; break;
         case SET_ABOUT:    sub = about_screen; break;
         case SET_CRASH:    crash_force(); break;
+        case SET_RESET:    sub = reset_screen; break;
         default:           break;
       }
       if (sub) {
