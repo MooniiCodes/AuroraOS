@@ -20,6 +20,7 @@ import argparse
 import struct
 import sys
 from pathlib import Path
+from typing import Optional
 
 MAGIC = b"AOS1"
 HEADER_FMT = "<4sIIIIIIII"  # 4 + 8*4 = 36 bytes
@@ -45,7 +46,7 @@ def _overlaps(addr: int, size: int, region: tuple[int, int]) -> bool:
 
 def pack(
     arm9_path: Path,
-    arm11_path: Path | None,
+    arm11_path: Optional[Path],
     output_path: Path,
     arm9_load: int,
     arm9_entry: int,
