@@ -139,6 +139,7 @@ static u32 str_len(const char *s) {
 }
 
 static int g_accent_idx = 0;
+static u8 g_brightness = 3;
 
 static UserConfig g_cfg;
 
@@ -271,7 +272,9 @@ static void settings_content(int id, u32 *asset, const unsigned char **icon,
     case SET_BRIGHTNESS:
       *asset = ASSET_ICON_DISPLAY_32;
       *icon = icon_brightness_bits; *name = L(STR_BRIGHTNESS);
-      *value = "3 / 5"; break;
+      *value = g_brightness == 0 ? "1 / 5" :
+               g_brightness == 1 ? "2 / 5" : g_brightness == 2 ? "3 / 5" :
+               g_brightness == 3 ? "4 / 5" : "5 / 5"; break;
     case SET_TOUCHCAL:
       *asset = ASSET_ICON_CONSOLE_32;
       *icon = icon_boot_bits; *name = L(STR_TOUCH_CAL);
@@ -2781,6 +2784,14 @@ static void settings_open(void) {
       if (!anim_list_moving(&set_list))
         settings_paint();
     }
+    if (sel == SET_BRIGHTNESS && (k & (BUTTON_DLEFT | BUTTON_DRIGHT))) {
+      if ((k & BUTTON_DRIGHT) && g_brightness < 4) g_brightness++;
+      if ((k & BUTTON_DLEFT) && g_brightness > 0) g_brightness--;
+      g_cfg.brightness = g_brightness;
+      audio_set_brightness(g_brightness);
+      user_config_save(&g_cfg);
+      settings_draw(sel);
+    }
     if ((k & BUTTON_A) || activate) {
       void (*sub)(void) = 0;
       switch (sel) {
@@ -3509,6 +3520,8 @@ void os_main(void) {
   g_accent = aurora_accent_presets[g_cfg.accent];
   g_lang = g_cfg.language;
   g_rtc_offset = g_cfg.clock_offset;
+  g_brightness = g_cfg.brightness <= 4 ? g_cfg.brightness : 3;
+  audio_set_brightness(g_brightness);
   if (g_cfg.touch_set && !touch_cal_set(&g_cfg.touch))
     g_cfg.touch_set = 0; /* unusable values: keep the default */
   boot_mark(BT_CONFIG);

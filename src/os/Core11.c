@@ -149,6 +149,15 @@ void audio11_main(void) {
           gpu11_run();
         else if (cmd == AUDIO_CMD_N3DS)
           clock11_set(ct, arg0);
+        else if (cmd == AUDIO_CMD_BRIGHTNESS) {
+          /* The PWM register takes calibrated luminance, not the menu index.
+           * These are the five stock 3DS brightness presets. */
+          static const uint16_t levels[5] = { 20, 43, 73, 95, 117 };
+          uint32_t value = levels[arg0 > 4u ? 4u : arg0];
+          MMIO32(0x10202240u) = value;
+          MMIO32(0x10202A40u) = value;
+          dsb();
+        }
         else if (cmd == AUDIO_CMD_RUN11)
           run11(ct, arg0, ct->arg1);
         else if (cmd == AUDIO_CMD_PARK)
