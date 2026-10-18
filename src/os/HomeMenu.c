@@ -1250,6 +1250,10 @@ static void system_menu_draw(int selected, int home_context) {
 
 void home_system_menu(int home_context) {
   int selected = SYS_POWER_OFF;
+  static u32 saved_bottom[BOT_FB_SIZE / 4];
+  volatile u32 *bottom = (volatile u32 *)VRAM_BOT_A;
+  for (u32 i = 0; i < BOT_FB_SIZE / 4; i++)
+    saved_bottom[i] = bottom[i];
 
   anim_popup(MN_X, MN_Y, MN_W, MN_H);
   system_menu_draw(selected, home_context);
@@ -1300,6 +1304,11 @@ void home_system_menu(int home_context) {
   anim_transition(ANIM_FADE, ANIM_BOT);
   if (home_context)
     back_home();
+  else {
+    for (u32 i = 0; i < BOT_FB_SIZE / 4; i++)
+      bottom[i] = saved_bottom[i];
+    screen_present_bottom();
+  }
 }
 
 static void button(int b) {
@@ -1564,16 +1573,6 @@ void home_run(void) {
     if (hk->tick)
       hk->tick();
     k = get_keys_down();
-
-    /* A chord outside normal navigation opens the system power menu. */
-    {
-      const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
-      if ((get_keys() & chord) == chord &&
-          (get_keys_physical_down() & chord)) {
-        home_system_menu(1);
-        continue;
-      }
-    }
 
     if (held != HL_NONE) {
       if (!by_touch)

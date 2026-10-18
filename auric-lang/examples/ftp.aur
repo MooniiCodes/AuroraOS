@@ -1,0 +1,297 @@
+// FTP for Auric: browse a folder of your computer from the 3DS and download
+// its files to the SD card.
+//
+// Auric's network is plain HTTP (no raw TCP sockets, no file reads), so this is
+// an FTP-style client, not the FTP protocol: it talks to tools/ftp_server.py,
+// which you run on the computer holding the files:
+//
+//   python tools/ftp_server.py ~/Downloads
+//
+// The server prints the SERVER line to paste below. Then:
+//
+//   python -m compiler.aurc build examples/ftp.aur -o FTP.BIN
+//   copy FTP.BIN to SD:\Aurora\Apps\ and create the SD folder Aurora\FTP
+//
+// D-pad: move   L/R: page   A: open folder / download file
+// B: parent folder   X: refresh   START: quit
+
+let SERVER: string = "http://192.168.1.50:8021";   // set to your computer
+let TOKEN: string = "";   // same as `--token` on the server, or "" for none
+
+let ROWS: int = 16;       // list rows that fit on the top screen
+let first: int = 0;       // first visible row
+let sel: int = 0;         // selected row
+let count: int = 0;       // rows in the current folder
+let dirty: bool = true;   // the list needs redrawing
+
+fn status(text: string, color: int) {
+    screen(BOTTOM);
+    fill_rect(0, 196, 320, 44, DARK_GRAY);
+    print(text, 8, 208, color);
+    present();
+}
+
+// Call right after a failed network built-in: net_error() changes at the
+// next request.
+fn show_error(what: string) {
+    screen(BOTTOM);
+    fill_rect(0, 196, 320, 44, DARK_GRAY);
+    print(what, 8, 200, RED);
+    print(net_error(), 8, 216, ORANGE);
+    present();
+}
+
+fn auth() {
+    if TOKEN != "" {
+        http_header("X-Token", TOKEN);
+    }
+}
+
+// One command to the server: "ls", "cd" or "up" (idx is the row for "cd").
+// The reply is the folder's listing, which stays readable until the next
+// request.
+fn request(cmd: string, idx: int) -> bool {
+    auth();
+    http_param("cmd", cmd);
+    http_param_int("i", idx);
+    let st = http_get(SERVER);
+    count = 0;
+    if st != 200 {
+        return false;
+    }
+    if !json_has("items") {
+        return false;
+    }
+    count = json_count("items");
+    return true;
+}
+
+fn clamp_view() {
+    if count == 0 {
+        sel = 0;
+        first = 0;
+        return;
+    }
+    if sel >= count {
+        sel = count - 1;
+    }
+    if sel < 0 {
+        sel = 0;
+    }
+    if sel < first {
+        first = sel;
+    }
+    if sel >= first + ROWS {
+        first = sel - ROWS + 1;
+    }
+    if first < 0 {
+        first = 0;
+    }
+}
+
+fn move_to(n: int) {
+    sel = n;
+    clamp_view();
+    dirty = true;
+}
+
+fn draw_size(bytes: int, y: int) {
+    if bytes >= 1048576 {
+        print_int(bytes / 1048576, 324, y, GRAY);
+        print("MB", 364, y, GRAY);
+    } else {
+        print_int((bytes + 1023) / 1024, 324, y, GRAY);
+        print("KB", 364, y, GRAY);
+    }
+}
+
+fn draw_list() {
+    screen(TOP);
+    clear(BLACK);
+    print("FTP", 4, 3, AURORA);
+    print(json_string("path"), 36, 3, WHITE);
+    fill_rect(0, 14, 400, 1, AURORA);
+
+    if count == 0 {
+        print("(empty, or no answer from the server)", 16, 20, GRAY);
+    }
+
+    let r = 0;
+    while r < ROWS {
+        let i = first + r;
+        if i >= count {
+            break;
+        }
+        json_index(i);
+        let y = 20 + r * 12;
+        let is_dir = json_bool("items.#.dir");
+        let c = WHITE;
+        if is_dir {
+            c = YELLOW;
+        }
+        if i == sel {
+            c = AURORA;
+            print(">", 4, y, AURORA);
+        }
+        if is_dir {
+            print("[D]", 16, y, c);
+            print(json_string("items.#.name"), 44, y, c);
+        } else {
+            print(json_string("items.#.name"), 16, y, c);
+            draw_size(json_int("items.#.size"), y);
+        }
+        r = r + 1;
+    }
+
+    print("A open/get  B up  X refresh", 4, 228, GRAY);
+    if count > 0 {
+        print_int(sel + 1, 300, 228, GRAY);
+        print("/", 340, 228, GRAY);
+        print_int(count, 352, 228, GRAY);
+    }
+    present();
+}
+
+// Enter the selected folder ("cd") or go to the parent ("up").
+fn go(cmd: string) {
+    status("Loading...", WHITE);
+    let ok = request(cmd, sel);
+    first = 0;
+    sel = 0;
+    dirty = true;
+    if ok {
+        status("", GRAY);
+    } else {
+        show_error("The server did not answer");
+    }
+}
+
+fn refresh() {
+    status("Loading...", WHITE);
+    if request("ls", 0) {
+        status("", GRAY);
+    } else {
+        show_error("The server did not answer");
+    }
+    clamp_view();
+    dirty = true;
+}
+
+// Download row i of the listing now on screen to the SD card. The download
+// replaces the last reply, so the listing is asked for again afterwards.
+fn download(i: int) {
+    json_index(i);
+    screen(BOTTOM);
+    fill_rect(0, 196, 320, 44, DARK_GRAY);
+    print("Downloading...", 8, 200, WHITE);
+    print(json_string("items.#.name"), 8, 216, GRAY);
+    present();
+
+    auth();
+    http_param("cmd", "dl");
+    http_param_int("i", i);
+    // "dest" is the SD path the server picked for this file.
+    let ok = http_download(SERVER, json_string("items.#.dest"));
+    if ok {
+        status("Saved to the SD card.", GREEN);
+    } else {
+        show_error("The download failed");
+    }
+    if !request("ls", 0) {
+        show_error("The server did not answer");
+    }
+    clamp_view();
+    dirty = true;
+}
+
+fn main() {
+    buffered(true);
+
+    screen(BOTTOM);
+    clear(DARK_GRAY);
+    print("Auric FTP", 8, 8, AURORA);
+    print("Server", 8, 32, GRAY);
+    print(SERVER, 8, 44, WHITE);
+    print("Console", 8, 64, GRAY);
+    print("UP/DOWN, L/R   move, page", 8, 100, WHITE);
+    print("A              open / download", 8, 116, WHITE);
+    print("B              parent folder", 8, 132, WHITE);
+    print("X              refresh", 8, 148, WHITE);
+    print("START          quit", 8, 164, WHITE);
+
+    screen(TOP);
+    clear(BLACK);
+    print("Auric FTP", 8, 8, AURORA);
+    print("Joining the Wi-Fi network...", 8, 32, WHITE);
+    print("(the first time takes about 25 seconds)", 8, 48, GRAY);
+    present();
+
+    if !net_connect() {
+        print("Could not connect", 8, 72, RED);
+        print(net_error(), 8, 88, ORANGE);
+        print("START: quit", 8, 120, WHITE);
+        present();
+        wait_key(KEY_START);
+        return;
+    }
+
+    screen(BOTTOM);
+    print(net_address(), 80, 64, WHITE);
+    refresh();
+
+    let rep_at = 0;
+    while true {
+        let k = keys_down();
+        let h = keys_held();
+        let now = millis();
+        let step = 0;
+
+        // D-pad with key repeat
+        if (k & KEY_DOWN) != 0 {
+            step = 1;
+            rep_at = now + 350;
+        } else if (k & KEY_UP) != 0 {
+            step = -1;
+            rep_at = now + 350;
+        } else if (h & KEY_DOWN) != 0 && now >= rep_at {
+            step = 1;
+            rep_at = now + 50;
+        } else if (h & KEY_UP) != 0 && now >= rep_at {
+            step = -1;
+            rep_at = now + 50;
+        }
+        if step != 0 && count > 0 {
+            move_to(sel + step);
+        }
+        if (k & KEY_R) != 0 {
+            move_to(sel + ROWS);
+        }
+        if (k & KEY_L) != 0 {
+            move_to(sel - ROWS);
+        }
+
+        if (k & KEY_A) != 0 && count > 0 {
+            json_index(sel);
+            if json_bool("items.#.dir") {
+                go("cd");
+            } else {
+                download(sel);
+            }
+        }
+        if (k & KEY_B) != 0 {
+            go("up");
+        }
+        if (k & KEY_X) != 0 {
+            refresh();
+        }
+        if (k & KEY_START) != 0 {
+            return;
+        }
+
+        if dirty {
+            draw_list();
+            dirty = false;
+        }
+        delay(20000);
+    }
+}

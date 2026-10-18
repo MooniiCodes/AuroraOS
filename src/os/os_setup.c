@@ -87,7 +87,7 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_A_APPLY_B_BACK*/
     {"A: Apply   B: Back", "A: Aplicar  B: Atr\u00E1s", "A: Appliquer B: Retour"},
     /* STR_POWER_OFF    */ {"Power Off", "Apagar", "\u00C9teindre"},
-    /* STR_REBOOT       */ {"Reboot", "Reiniciar", "Red\u00E9marrer"},
+    /* STR_REBOOT       */ {"Reboot to HorizonOS", "Reiniciar en HorizonOS", "Red\u00E9marrer vers HorizonOS"},
     /* STR_SYSTEM       */ {"System", "Sistema", "Syst\u00E8me"},
     /* STR_EMPTY_SLOT   */ {"Empty Slot", "Vac\u00EDo", "Vide"},
     /* STR_LOADING      */ {"Loading...", "Cargando...", "Chargement..."},

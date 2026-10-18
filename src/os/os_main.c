@@ -48,6 +48,7 @@ u32 get_keys(void) { return ~REG_HID_PAD & 0xFFF; }
 static u32 prev_keys = 0;
 static u32 prev_physical_keys = 0;
 static u32 last_physical_down = 0;
+static int system_menu_from_chord;
 static u32 prev_cpad_dirs = 0;
 static int cpad_nav_enabled = 1;
 static u32 repeat_mark;
@@ -121,6 +122,19 @@ u32 get_keys_down(void) {
   last_physical_down = physical_down;
   prev_physical_keys = physical;
   prev_keys = cur;
+
+  /* This is the shared input path for Aurora screens, so the system chord
+   * remains available in Settings, Store, Files, and other nested screens. */
+  {
+    const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
+    if (!system_menu_from_chord && (physical & chord) == chord &&
+        (physical_down & chord)) {
+      system_menu_from_chord = 1;
+      home_system_menu(0);
+      system_menu_from_chord = 0;
+      down &= ~chord;
+    }
+  }
   return down;
 }
 
