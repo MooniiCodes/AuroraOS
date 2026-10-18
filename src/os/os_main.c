@@ -2492,6 +2492,7 @@ static const Person team[] = {
     {ASSET_PERSON_DISLOPIK_40, "DisLoPik", "CEO"},
     {ASSET_PERSON_STAR_40,     "Star",     "Founder"},
     {ASSET_PERSON_ATEXBG_40,   "AtexBg",   "Low-level Developer"},
+    {ASSET_PERSON_SAIITANAA_40,"Saiitanaa","Low-level Developer"},
     {ASSET_PERSON_KYAERO_40,   "Kyaero",   "Interface Designer"},
     {ASSET_PERSON_SECRET_40,   "Secret",   "Drivers and GPIO"},
 };
