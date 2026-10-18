@@ -12,6 +12,7 @@
 #include "screenshot.h"
 #include "sdmmc.h"
 #include "statusbar.h"
+#include "system_menu.h"
 #include "store.h"
 #include "terminal.h"
 #include "touchcal.h"
@@ -130,11 +131,13 @@ u32 get_keys_down(void) {
     if (!system_menu_from_chord && (physical & chord) == chord &&
         (physical_down & chord)) {
       system_menu_from_chord = 1;
-      home_system_menu(0);
+      home_system_menu();
       system_menu_from_chord = 0;
       down &= ~chord;
     }
   }
+  if (home_navigation_requested())
+    down = BUTTON_B;
   return down;
 }
 
@@ -3035,6 +3038,11 @@ static void os_install_return(void) {
   desc[0] = AURORA_RETURN_READY_MAGIC;
   desc[1] = os_size;
 
+  volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+  menu->action = AURORA_SYSTEM_MENU_NONE;
+  menu->menu_open = 0;
+  menu->app_active = 1;
+
   volatile u8 *rs = (volatile u8 *)AURORA_RETURN_STUB_ADDR;
   const unsigned char *rc = os_return_stub;
   u32 rn = (u32)(os_return_stub_end - os_return_stub);
@@ -3475,6 +3483,14 @@ static void os_gpu_late(void) {
 }
 
 void os_main(void) {
+  /* The ARM11 menu service is resident across app launches. Start with its
+   * app-only hotkey disabled; os_install_return enables it for each app. */
+  volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+  menu->app_active = 0;
+  menu->menu_open = 0;
+  menu->action = AURORA_SYSTEM_MENU_NONE;
+  os_cache_sync();
+
   /* Protection unit and caches first; the firm leaves them off. Holding SELECT
    * at boot skips this, so a build that misbehaves with caches still starts. */
   if (!(get_keys() & BUTTON_SELECT)) {

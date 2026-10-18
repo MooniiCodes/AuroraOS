@@ -36,7 +36,10 @@ void home_reload(const HomeApp *apps, int n);
 void home_draw(void);
 /* The menu's loop; never returns. */
 void home_run(void);
-/* Power-off/reboot menu. `home_context` redraws the Home Menu on cancel. */
-void home_system_menu(int home_context);
+/* The shared L + Down + Select menu. */
+void home_system_menu(void);
+/* Set while nested screens unwind after choosing Home in the system menu. */
+int home_navigation_requested(void);
+void home_navigation_clear(void);
 
 #endif

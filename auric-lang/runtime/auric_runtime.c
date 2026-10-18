@@ -14,6 +14,7 @@
 #include "user.h"
 #include "auric_runtime.h"
 #include "auric_internal.h"
+#include "system_menu.h"
 
 /* ARM9 timers at 0x10003000: a value/reload register then a control register
  * per timer. Control bits 0-1 prescaler (/1, /64, /256, /1024), bit 2 count-up,
@@ -104,6 +105,8 @@ static u32 aur_pool_used;
 static int aur_audio;          /* 0 not checked yet, 1 usable, -1 not */
 static int aur_voices_started; /* anything played that might still sound */
 
+static void aur_system_menu_request_poll(void);
+
 /* Launched by the Home Menu rather than booted directly. Only then is the
  * ARM11 core, and so the GPU and sound, there to answer. */
 int aur_from_home(void) {
@@ -156,8 +159,10 @@ static void aur_audio_post(u32 cmd, u32 a0, u32 a1, u32 a2, u32 a3) {
   os_dcache_clean_range(&ct->cmd_seq, sizeof(u32));
   for (u32 spin = 0; spin < 2000000u; spin++) {
     aur_inval_line(&ct->ack_seq);
-    if (ct->ack_seq == ct->cmd_seq)
+    if (ct->ack_seq == ct->cmd_seq) {
+      aur_system_menu_request_poll();
       return;
+    }
   }
 }
 
@@ -167,7 +172,19 @@ void delay(volatile u32 cycles) {
 }
 
 /* Pad bits 0..9 are A/B/Select/Start/D-pad/R/L; 10 and 11 are X and Y. */
-u32 get_keys(void) { return ~REG_HID_PAD & 0xFFF; }
+u32 get_keys(void) {
+  if (aur_from_home()) {
+    volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+    for (;;) {
+      aur_inval_line((const void *)&menu->menu_open);
+      if (!menu->menu_open)
+        break;
+      delay(60000); /* pause an app at its next Auric input boundary */
+    }
+  }
+  aur_system_menu_request_poll();
+  return ~REG_HID_PAD & 0xFFF;
+}
 
 static u32 aur_prev_keys = 0;
 u32 get_keys_down(void) {
@@ -180,8 +197,15 @@ u32 get_keys_down(void) {
 /* HOME is not on the HID pad; it is reported by the MCU. Reading MCU IRQ
  * register 0x10 clears its flags; bit 2 of byte 0 signals a HOME press. */
 static int aur_i2c_ready = 0;
+static u32 aur_home_poll_at;
 
 int aur_home_pressed(void) {
+  if (aur_from_home()) {
+    volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+    aur_inval_line((const void *)&menu->menu_open);
+    if (menu->menu_open)
+      return 0; /* avoid app teardown while the ARM11 service owns its core */
+  }
   if (!aur_i2c_ready) {
     I2C_init();
     aur_i2c_ready = 1;
@@ -201,22 +225,48 @@ void aur_leave(void) {
   __builtin_unreachable();
 }
 
-/* A directly booted app has no OS to return to, so HOME is ignored. */
-static void aur_home_poll_now(void) {
+static void aur_home_button_poll_due(void) {
+  u32 now = aur_ticks();
+  if (now - aur_home_poll_at < TICKS_PER_MS * 12u)
+    return;
+  aur_home_poll_at = now;
   if (aur_from_home() && aur_home_pressed())
     aur_leave();
 }
 
-/* Called from every built-in. An MCU read is a full I2C transaction and a game
- * calls built-ins hundreds of times a frame, so HOME is sampled every 64 calls;
- * blocking calls poll it directly. */
-static int aur_home_tick = 0;
+static void aur_system_menu_request_poll(void) {
+  volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+  if (!aur_from_home())
+    return;
+  aur_inval_line((const void *)&menu->menu_open);
+  if (menu->menu_open)
+    return; /* let the ARM11 menu finish before an app posts teardown work */
+  aur_inval_line((const void *)&menu->action);
+  if (menu->action == AURORA_SYSTEM_MENU_HOME) {
+    menu->action = AURORA_SYSTEM_MENU_NONE;
+    os_dcache_clean_range(&menu->action, sizeof(menu->action));
+    aur_leave();
+  }
+}
+
+/* A normal return from an Auric main is the app's quit action too. */
+void aur_app_return(void) {
+  if (aur_from_home())
+    aur_leave();
+  for (;;)
+    __asm__ volatile("mcr p15, 0, %0, c7, c0, 4" : : "r"(0));
+}
+
+/* A directly booted app has no OS to return to, so HOME is ignored. */
+static void aur_home_poll_now(void) {
+  aur_system_menu_request_poll();
+  if (aur_from_home() && aur_home_pressed())
+    aur_leave();
+}
 
 void aur_check_home(void) {
-  if (++aur_home_tick < 64)
-    return;
-  aur_home_tick = 0;
-  aur_home_poll_now();
+  aur_system_menu_request_poll();
+  aur_home_button_poll_due();
 }
 
 /* Immediate mode presents after every drawing call; buffered mode waits for

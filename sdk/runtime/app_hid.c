@@ -5,6 +5,10 @@
 #include "touch.h"
 #include "user.h"
 
+#include <stdlib.h>
+
+extern void os_dcache_clean_range(const void *addr, u32 len);
+
 /* Raw ADC units from the rest point: the dead zone and a full push, as the
  * 3D Model screen uses them. */
 #define CPAD_DEAD 150
@@ -17,11 +21,52 @@ static int g_tx = -1, g_ty = -1, g_cx, g_cy;
 static int g_touch;            /* 0 not set up yet, 1 usable, -1 not */
 static bool g_touch_ignore = true; /* a touch from before the app started */
 
-static u32 pad(void) { return ~REG_HID_PAD & 0xFFFu; }
+static u32 pad(void) {
+  if (app_from_home()) {
+    volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+    for (;;) {
+      __asm__ volatile("mcr p15, 0, %0, c7, c6, 1"
+                       : : "r"(&menu->menu_open) : "memory");
+      if (!menu->menu_open)
+        break;
+      delay(60000); /* pause an app at its next SDK input boundary */
+    }
+  }
+  return ~REG_HID_PAD & 0xFFFu;
+}
 
 /* Whatever is held as the app starts (the A that launched it) is not a new
  * press. */
 void app_hid_init(void) { g_held = pad(); }
+
+bool app_hid_system_menu_open(void) {
+  volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+  if (!app_from_home())
+    return false;
+  __asm__ volatile("mcr p15, 0, %0, c7, c6, 1" : : "r"(&menu->menu_open)
+                   : "memory");
+  return menu->menu_open != 0;
+}
+
+/* The ARM11 system-menu service owns the hotkey and display. The runtime only
+ * consumes its Home request at an SDK boundary so cleanup and the existing
+ * OS return stub still run normally. */
+void app_hid_home_menu_poll(void) {
+  volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+  if (g_app_leaving || !app_from_home())
+    return;
+  __asm__ volatile("mcr p15, 0, %0, c7, c6, 1" : : "r"(&menu->menu_open)
+                   : "memory");
+  if (menu->menu_open)
+    return; /* ARM11 is still in the menu and cannot service app teardown yet */
+  __asm__ volatile("mcr p15, 0, %0, c7, c6, 1" : : "r"(&menu->action)
+                   : "memory");
+  if (menu->action == AURORA_SYSTEM_MENU_HOME) {
+    menu->action = AURORA_SYSTEM_MENU_NONE;
+    os_dcache_clean_range((const void *)&menu->action, sizeof(menu->action));
+    exit(0);
+  }
+}
 
 static int axis(int v) {
   int a = v < 0 ? -v : v;
@@ -90,9 +135,18 @@ void hid_scan(void) {
   g_held = cur;
 }
 
-uint32_t hid_keys_down(void) { return g_down; }
-uint32_t hid_keys_held(void) { return g_held; }
-uint32_t hid_keys_up(void) { return g_up; }
+uint32_t hid_keys_down(void) {
+  app_hid_home_menu_poll();
+  return g_down;
+}
+uint32_t hid_keys_held(void) {
+  app_hid_home_menu_poll();
+  return g_held;
+}
+uint32_t hid_keys_up(void) {
+  app_hid_home_menu_poll();
+  return g_up;
+}
 
 bool hid_touch_held(void) { return (g_held & KEY_TOUCH) != 0; }
 bool hid_touch_down(void) { return (g_down & KEY_TOUCH) != 0; }
