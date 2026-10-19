@@ -2650,44 +2650,63 @@ static void info_screen(void) {
 
 static void about_screen(void) {
   static FATFS afs;
-  char sd[48], *p = sd;
-  DWORD free_clst;
-  FATFS *fs;
+  FFREE_SCAN scan = {0};
+  FATFS *fs = NULL;
+  DWORD free_clst = 0;
+  FRESULT fr;
+  char sd[48];
+  int scan_done = 0;
 
+  sd[0] = '.';
+  sd[1] = '.';
+  sd[2] = '.';
+  sd[3] = 0;
   about_top();
   about_bottom("...");
-
-  if (f_mount(&afs, "", 1) != FR_OK) {
-    p = about_str(p, L(STR_NO_CARD));
+  fr = f_mount(&afs, "", 1);
+  if (fr == FR_OK) {
+    fs = &afs;
   } else {
-    if (f_getfree("", &free_clst, &fs) == FR_OK) {
-      p = about_gb(p, (unsigned long long)free_clst * fs->csize);
-      p = about_str(p, " / ");
-      p = about_gb(p, (unsigned long long)(fs->n_fatent - 2u) * fs->csize);
-      p = about_str(p, " GB ");
-      p = about_str(p, L(STR_FREE));
-    } else {
-      p = about_str(p, "---");
-    }
-    f_mount(NULL, "", 0);
+    char *p = about_str(sd, L(STR_NO_CARD));
+    *p = 0;
+    scan_done = 1;
+    about_bottom(sd);
   }
-  *p = 0;
-  ui_idle(); /* collect the present before drawing into that buffer again */
-  about_bottom(sd);
 
   while (1) {
     u32 k = get_keys_down();
     int tx, ty, more = (k & BUTTON_A) != 0;
+
+    if (!scan_done && fs) {
+      int done = 0;
+      fr = f_getfree_step(fs, &scan, &free_clst, 4, &done);
+      if (fr != FR_OK) {
+        char *p = about_str(sd, "---");
+        *p = 0;
+        scan_done = 1;
+        about_bottom(sd);
+      } else if (done) {
+        char *p = sd;
+        p = about_gb(p, (unsigned long long)free_clst * fs->csize);
+        p = about_str(p, " / ");
+        p = about_gb(p, (unsigned long long)(fs->n_fatent - 2u) * fs->csize);
+        p = about_str(p, " GB ");
+        p = about_str(p, L(STR_FREE));
+        *p = 0;
+        scan_done = 1;
+        about_bottom(sd);
+      }
+    }
 
     if (touch_tap(&tx, &ty)) {
       if (touch_in(tx, ty, ABOUT_MORE_X, ABOUT_BTN_Y, ABOUT_BTN_W, ABOUT_BTN_H))
         more = 1;
       else if (touch_in(tx, ty, ABOUT_BACK_X, ABOUT_BTN_Y, ABOUT_BTN_W,
                         ABOUT_BTN_H))
-        return;
+        break;
     }
     if (k & BUTTON_B)
-      return;
+      break;
     if (more) {
       open_screen(info_screen);
       about_top();
@@ -2695,6 +2714,7 @@ static void about_screen(void) {
     }
     ui_idle();
   }
+  f_mount(NULL, "", 0);
 }
 
 /* A new calibration is in use as soon as it is accepted; saving only decides

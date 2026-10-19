@@ -4927,6 +4927,108 @@ FRESULT f_getfree (
 	LEAVE_FF(fs, res);
 }
 
+FRESULT f_getfree_step (
+	FATFS* fs,
+	FFREE_SCAN* scan,
+	DWORD* nclst,
+	UINT sector_budget,
+	int* done
+)
+{
+	FRESULT res = FR_OK;
+	UINT steps;
+
+	if (!fs || !scan || !nclst || !done || !sector_budget || !fs->fs_type)
+		return FR_INVALID_PARAMETER;
+	*done = 0;
+	if (fs->free_clst <= fs->n_fatent - 2) {
+		*nclst = fs->free_clst;
+		*done = 1;
+		return FR_OK;
+	}
+	if (!scan->active || scan->fs != fs || scan->id != fs->id) {
+		memset(scan, 0, sizeof(*scan));
+		scan->fs = fs;
+		scan->id = fs->id;
+		scan->active = 1;
+		scan->nfree = 0;
+		if (fs->fs_type == FS_FAT12) {
+			scan->cluster = 2;
+			scan->remaining = fs->n_fatent - 2;
+		} else if (fs->fs_type == FS_EXFAT) {
+#if FF_FS_EXFAT
+			scan->sect = fs->bitbase;
+			scan->remaining = fs->n_fatent - 2;
+#else
+			return FR_INVALID_OBJECT;
+#endif
+		} else {
+			scan->sect = fs->fatbase;
+			scan->remaining = fs->n_fatent;
+		}
+	}
+
+	if (fs->fs_type == FS_FAT12) {
+		FFOBJID obj;
+		obj.fs = fs;
+		/* FAT12 entries are bit-packed, so bound work by cluster lookups. */
+		steps = sector_budget * (SS(fs) / 2);
+		while (scan->remaining && steps--) {
+			DWORD stat = get_fat(&obj, scan->cluster++);
+			if (stat == 0xFFFFFFFF) { res = FR_DISK_ERR; break; }
+			if (stat == 1) { res = FR_INT_ERR; break; }
+			if (stat == 0) scan->nfree++;
+			scan->remaining--;
+		}
+	} else if (fs->fs_type == FS_EXFAT) {
+#if FF_FS_EXFAT
+		steps = sector_budget * SS(fs);
+		while (scan->remaining && steps--) {
+			BYTE bm;
+			if (scan->offset == 0) {
+				res = move_window(fs, scan->sect++);
+				if (res != FR_OK) break;
+			}
+			bm = (BYTE)~fs->win[scan->offset];
+			for (UINT b = 0; b < 8 && scan->remaining; b++, scan->remaining--) {
+				scan->nfree += bm & 1;
+				bm >>= 1;
+			}
+			scan->offset = (scan->offset + 1) % SS(fs);
+		}
+#endif
+	} else {
+		UINT entry_size = fs->fs_type == FS_FAT16 ? 2 : 4;
+		steps = sector_budget * (SS(fs) / entry_size);
+		while (scan->remaining && steps--) {
+			if (scan->offset == 0) {
+				res = move_window(fs, scan->sect++);
+				if (res != FR_OK) break;
+			}
+			if (entry_size == 2) {
+				if (ld_16(fs->win + scan->offset) == 0) scan->nfree++;
+			} else {
+				if ((ld_32(fs->win + scan->offset) & 0x0FFFFFFF) == 0) scan->nfree++;
+			}
+			scan->offset = (scan->offset + entry_size) % SS(fs);
+			scan->remaining--;
+		}
+	}
+
+	if (res != FR_OK) {
+		scan->active = 0;
+		return res;
+	}
+	if (scan->remaining == 0) {
+		*nclst = scan->nfree;
+		fs->free_clst = scan->nfree;
+		fs->fsi_flag |= 1;
+		scan->active = 0;
+		*done = 1;
+	}
+	return FR_OK;
+}
+
 
 
 
