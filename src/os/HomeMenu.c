@@ -1216,12 +1216,13 @@ static void power_ask(void) {
 enum { SYS_HOME, SYS_POWER_OFF, SYS_CANCEL, SYS_COUNT };
 
 static int navigation_requested;
+static int home_started;
 
 int home_navigation_requested(void) { return navigation_requested; }
 
 void home_navigation_clear(void) { navigation_requested = 0; }
 
-static void system_menu_draw(int selected) {
+static void system_menu_draw(const int *rows, int n, int selected) {
   volatile u8 *fb = VRAM_BOT_A;
   static const Color black = {0x00, 0x00, 0x00};
   static const Color cyan = {0x64, 0xE8, 0xC8};
@@ -1231,11 +1232,12 @@ static void system_menu_draw(int selected) {
 
   clear_screen(fb, BOT_FB_SIZE, black);
   ui_text(fb, 8, 8, BSH, title, cyan, black, &ui_small);
-  for (int i = 0; i < SYS_COUNT; i++) {
+  for (int i = 0; i < n; i++) {
     int y = 32 + i * 16;
     if (i == selected)
       ui_text(fb, 8, y, BSH, ">", cyan, black, &ui_small);
-    ui_text(fb, 28, y, BSH, L(labels[i]), COLOR_WHITE, black, &ui_small);
+    ui_text(fb, 28, y, BSH, L(labels[rows[i]]), COLOR_WHITE, black,
+            &ui_small);
   }
   ui_text(fb, 8, BSH - 16, BSH, "A: Select   B: Close", cyan, black,
           &ui_small);
@@ -1243,27 +1245,37 @@ static void system_menu_draw(int selected) {
 }
 
 void home_system_menu(void) {
-  int selected = SYS_HOME;
+  static const int all_rows[SYS_COUNT] = {SYS_HOME, SYS_POWER_OFF,
+                                          SYS_CANCEL};
+  /* Before home_run (the setup wizard, the boot warning) there is no Home
+   * Menu to return to, and nothing would clear the request. */
+  const int *rows = home_started ? all_rows : all_rows + 1;
+  int n = home_started ? SYS_COUNT : SYS_COUNT - 1;
+  int selected = 0;
   static u32 saved_bottom[BOT_FB_SIZE / 4];
   volatile u32 *bottom = (volatile u32 *)VRAM_BOT_A;
+
+  /* A transition armed by the screen underneath would take the menu's
+   * present as its new frame. */
+  anim_flush();
   for (u32 i = 0; i < BOT_FB_SIZE / 4; i++)
     saved_bottom[i] = bottom[i];
 
-  system_menu_draw(selected);
+  system_menu_draw(rows, n, selected);
   for (;;) {
     u32 k = get_keys_down();
     int tx, ty, next = selected, chosen = -1;
     if (k & BUTTON_DUP)
-      next = selected > 0 ? selected - 1 : SYS_COUNT - 1;
+      next = selected > 0 ? selected - 1 : n - 1;
     if (k & BUTTON_DDOWN)
-      next = selected + 1 < SYS_COUNT ? selected + 1 : 0;
+      next = selected + 1 < n ? selected + 1 : 0;
     if (touch_tap(&tx, &ty)) {
-      for (int i = 0; i < SYS_COUNT; i++)
+      for (int i = 0; i < n; i++)
         if (touch_in(tx, ty, 20, 28 + i * 16, BW - 40, 16))
-          chosen = i;
+          chosen = rows[i];
     }
     if (k & BUTTON_A)
-      chosen = selected;
+      chosen = rows[selected];
     if (k & BUTTON_B)
       break;
     if (chosen == SYS_HOME) {
@@ -1274,7 +1286,7 @@ void home_system_menu(void) {
       if (fv_confirm(L(STR_POWER_ASK), "", L(STR_POWER_OFF), L(STR_CANCEL)))
         power_shutdown();
       else {
-        system_menu_draw(selected);
+        system_menu_draw(rows, n, selected);
         continue;
       }
       break;
@@ -1283,7 +1295,7 @@ void home_system_menu(void) {
       break;
     if (next != selected) {
       selected = next;
-      system_menu_draw(selected);
+      system_menu_draw(rows, n, selected);
     }
     ui_idle();
   }
@@ -1550,6 +1562,7 @@ void home_run(void) {
   int clock_tick = 0, last_min = -1;
   u32 frame_at = 0;
 
+  home_started = 1;
   for (;;) {
     u32 k;
     int ms;
@@ -1562,6 +1575,8 @@ void home_run(void) {
      * request so normal navigation resumes. */
     if (home_navigation_requested()) {
       home_navigation_clear();
+      if (held != HL_NONE)
+        cancel_carry();
       back_home();
       continue;
     }

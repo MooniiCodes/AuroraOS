@@ -2,10 +2,10 @@
  *
  * Everything an app written in C needs from AuroraOS: both screens and
  * drawing, buttons, touch and the circle pad, sound, files, time, system
- * information and the network (HTTP). The C standard library (devkitARM's newlib) works alongside
- * it: printf() and friends write to an on-screen console, malloc() has a
- * 16 MB heap, fopen() and the rest of stdio reach the SD card, and time()
- * reads the console's clock.
+ * information and the network (HTTP). The C standard library (devkitARM's
+ * newlib) works alongside it: printf() and friends write to an on-screen
+ * console, malloc() has a 16 MB heap, fopen() and the rest of stdio reach the
+ * SD card, and time() reads the console's clock.
  *
  * A minimal app:
  *

@@ -102,7 +102,7 @@ void audio_error_beep(void) {
 
 /* HOME is not on the HID pad: the MCU reports it in its interrupt flags,
  * which reading register 0x10 also clears. Bit 2 of the first byte is a HOME
- * press. Poll the SDK system-menu chord alongside it. */
+ * press. */
 bool app_home_pressed(void) {
   if (app_hid_system_menu_open())
     return false; /* the resident menu must release the core before exit */
@@ -231,8 +231,8 @@ bool app_loop(void) {
   u32 now;
   u32 shown;
 
-  /* Check before a potentially blocking present as well as after input scan;
-   * HOME is a short MCU event and an app can spend time drawing between frames. */
+  /* Before the present as well as at the input scan, so a slow frame does not
+   * hold up HOME or Return to Home. */
   app_poll_home();
   app_flush_stdout();
   shown = app_present();

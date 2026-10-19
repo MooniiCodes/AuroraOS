@@ -124,12 +124,13 @@ u32 get_keys_down(void) {
   prev_physical_keys = physical;
   prev_keys = cur;
 
-  /* This is the shared input path for Aurora screens, so the system chord
-   * remains available in Settings, Store, Files, and other nested screens. */
+  /* Every OS screen reads its input here, so the chord works on all of them.
+   * Not while the core runs a Wi-Fi command: the menu's presents and pop-up
+   * need the core. */
   {
     const u32 chord = BUTTON_L | BUTTON_DDOWN | BUTTON_SELECT;
-    if (!system_menu_from_chord && (physical & chord) == chord &&
-        (physical_down & chord)) {
+    if (!system_menu_from_chord && !wifi_direct_active() &&
+        (physical & chord) == chord && (physical_down & chord)) {
       system_menu_from_chord = 1;
       home_system_menu();
       system_menu_from_chord = 0;
@@ -157,6 +158,9 @@ static u32 str_len(const char *s) {
 
 static int g_accent_idx = 0;
 static u8 g_brightness = 3;
+#define BR_LEVELS 5
+static const char *const br_labels[BR_LEVELS] = {"1 / 5", "2 / 5", "3 / 5",
+                                                 "4 / 5", "5 / 5"};
 
 static UserConfig g_cfg;
 
@@ -289,9 +293,7 @@ static void settings_content(int id, u32 *asset, const unsigned char **icon,
     case SET_BRIGHTNESS:
       *asset = ASSET_ICON_DISPLAY_32;
       *icon = icon_brightness_bits; *name = L(STR_BRIGHTNESS);
-      *value = g_brightness == 0 ? "1 / 5" :
-               g_brightness == 1 ? "2 / 5" : g_brightness == 2 ? "3 / 5" :
-               g_brightness == 3 ? "4 / 5" : "5 / 5"; break;
+      *value = br_labels[g_brightness < BR_LEVELS ? g_brightness : 3]; break;
     case SET_TOUCHCAL:
       *asset = ASSET_ICON_CONSOLE_32;
       *icon = icon_boot_bits; *name = L(STR_TOUCH_CAL);
@@ -459,6 +461,114 @@ static void clock_screen(void) {
     int ms = anim_frame(&frame_at);
     if (ms && anim_step(&ck_ring, ms))
       clock_bottom();
+    ui_idle();
+  }
+}
+
+static char *snd_cpy(char *dst, const char *src);
+static void snd_u32(char *out, u32 v);
+
+/* Settings > Brightness: five bars, each step shown at once on both
+ * screens; A keeps the level, B puts the old one back. */
+#define BR_BAR_W    40
+#define BR_GAP      12
+#define BR_BASE     150 /* bottom edge of every bar */
+#define BR_BAR_H(i) (36 + (i) * 18)
+#define BR_X(i) ((BOT_SCREEN_WIDTH - BR_LEVELS * BR_BAR_W -                   \
+                  (BR_LEVELS - 1) * BR_GAP) / 2 + (i) * (BR_BAR_W + BR_GAP))
+
+static void bright_top(int level) {
+  char line[48], num[12], *p = line;
+  hm_top_static();
+  ui_icon(VRAM_TOP_LA, (TOP_SCREEN_WIDTH - 96) / 2, 30, 96, TOP_SCREEN_HEIGHT,
+          ASSET_ICON_DISPLAY_64, icon_brightness_bits, COLOR_WHITE);
+  ui_text_mid(VRAM_TOP_LA, TOP_SCREEN_WIDTH / 2, 130, TOP_SCREEN_HEIGHT,
+              L(STR_BRIGHTNESS), COLOR_WHITE, COLOR_HM_BG_BOT, &ui_title);
+  ui_text_mid(VRAM_TOP_LA, TOP_SCREEN_WIDTH / 2, 166, TOP_SCREEN_HEIGHT,
+              br_labels[level], COLOR_WHITE, COLOR_HM_BG_BOT, &ui_font);
+  ui_text_mid_fit(VRAM_TOP_LA, TOP_SCREEN_WIDTH / 2, 194, TOP_SCREEN_HEIGHT,
+                  L(STR_BRIGHT_HINT), TOP_SCREEN_WIDTH - 24, COLOR_HM_TEXT2,
+                  COLOR_HM_BG_BOT, &ui_small);
+  /* What the core read back from the LCD registers after the last change,
+   * so a level that does not show on the panel can be told from one that
+   * never reached it. */
+  if (audio_alive()) {
+    p = snd_cpy(p, "Backlight PWM ");
+    snd_u32(num, audio_diag(5) & 0x3FFu);
+    p = snd_cpy(p, num);
+    p = snd_cpy(p, " / ");
+    snd_u32(num, audio_diag(7) & 0x3FFu);
+    p = snd_cpy(p, num);
+    if (audio_diag(4) & 1u)
+      snd_cpy(p, ", ABL on");
+    ui_text_mid(VRAM_TOP_LA, TOP_SCREEN_WIDTH / 2, 214, TOP_SCREEN_HEIGHT,
+                line, COLOR_HM_TEXT2, COLOR_HM_BG_BOT, &ui_small);
+  }
+  screen_present_top();
+}
+
+static void bright_bottom(int level) {
+  volatile u8 *fb = VRAM_BOT_A;
+  ui_wallpaper(fb, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT, BOT_SCREEN_HEIGHT);
+  for (int i = 0; i < BR_LEVELS; i++) {
+    int h = BR_BAR_H(i), x = BR_X(i), y = BR_BASE - h;
+    if (i <= level)
+      draw_filled_round_rect(fb, x, y, BR_BAR_W, h, 10, BOT_SCREEN_HEIGHT,
+                             g_accent);
+    else
+      draw_gradient_round_rect(fb, x, y, BR_BAR_W, h, 10, BOT_SCREEN_HEIGHT,
+                               COLOR_HM_SLOT_TOP, COLOR_HM_SLOT_BOT);
+    if (i == level)
+      draw_round_ring(fb, x - 3, y - 3, BR_BAR_W + 6, h + 6, 13, 4,
+                      BOT_SCREEN_HEIGHT, COLOR_WHITE);
+  }
+  ui_text_mid(fb, BOT_SCREEN_WIDTH / 2, BR_BASE + 16, BOT_SCREEN_HEIGHT,
+              br_labels[level], COLOR_WHITE, COLOR_HM_BG_BOT, &ui_bold);
+  ui_text_mid_fit(fb, BOT_SCREEN_WIDTH / 2, BOT_SCREEN_HEIGHT - 26,
+                  BOT_SCREEN_HEIGHT, L(STR_BRIGHT_KEYS), BOT_SCREEN_WIDTH - 16,
+                  COLOR_HM_TEXT2, COLOR_HM_BG_BOT, &ui_small);
+  screen_present_bottom();
+}
+
+static void bright_set(int level) {
+  g_brightness = (u8)level;
+  audio_set_brightness((u32)level);
+  bright_top(level);
+  bright_bottom(level);
+}
+
+static void brightness_screen(void) {
+  int level = g_brightness < BR_LEVELS ? g_brightness : 3;
+  int kept = level;
+  bright_top(level);
+  bright_bottom(level);
+  for (;;) {
+    u32 k = get_keys_down();
+    int next = level, tx, ty;
+    if ((k & (BUTTON_DLEFT | BUTTON_DDOWN)) && level > 0)
+      next = level - 1;
+    if ((k & (BUTTON_DRIGHT | BUTTON_DUP)) && level < BR_LEVELS - 1)
+      next = level + 1;
+    if (touch_tap(&tx, &ty))
+      for (int i = 0; i < BR_LEVELS; i++)
+        if (touch_in(tx, ty, BR_X(i) - BR_GAP / 2, BR_BASE - BR_BAR_H(4) - 8,
+                     BR_BAR_W + BR_GAP, BR_BAR_H(4) + 16))
+          next = i;
+    if (next != level) {
+      level = next;
+      bright_set(level);
+    }
+    if (k & BUTTON_A) {
+      g_cfg.brightness = (u8)level;
+      user_config_save(&g_cfg);
+      return;
+    }
+    if (k & BUTTON_B) {
+      g_brightness = (u8)kept;
+      if (level != kept)
+        audio_set_brightness((u32)kept);
+      return;
+    }
     ui_idle();
   }
 }
@@ -2816,6 +2926,7 @@ static void settings_open(void) {
         case SET_ACCOUNT:  sub = account_open; break;
         case SET_ACCENT:   sub = accent_screen; break;
         case SET_CLOCK:    sub = clock_screen; break;
+        case SET_BRIGHTNESS: sub = brightness_screen; break;
         case SET_TOUCHCAL: sub = touch_cal_screen; break;
         case SET_WIFITEST: sub = wifi_test_screen; break;
         case SET_GPUTEST:  sub = gpu_test_screen; break;
@@ -3041,6 +3152,7 @@ static void os_install_return(void) {
   volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
   menu->action = AURORA_SYSTEM_MENU_NONE;
   menu->menu_open = 0;
+  menu->app_caps = 0;
   menu->app_active = 1;
 
   volatile u8 *rs = (volatile u8 *)AURORA_RETURN_STUB_ADDR;
@@ -3487,6 +3599,7 @@ void os_main(void) {
    * app-only hotkey disabled; os_install_return enables it for each app. */
   volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
   menu->app_active = 0;
+  menu->app_caps = 0;
   menu->menu_open = 0;
   menu->action = AURORA_SYSTEM_MENU_NONE;
   os_cache_sync();

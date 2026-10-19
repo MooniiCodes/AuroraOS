@@ -402,6 +402,8 @@ void wifi_join_why(const WifiShared *w, const char *ssid, char *out,
  * when nothing was running. */
 void wifi_direct_on(void);
 int wifi_direct_off(void);
+/* 1 between wifi_direct_on and a wifi_direct_off that returned 1. */
+int wifi_direct_active(void);
 /* Waits for the posted command, calling `tick` (may be 0) about every 100 ms
  * with the milliseconds waited; it may draw with the CPU only. 1 when the core
  * finished. */

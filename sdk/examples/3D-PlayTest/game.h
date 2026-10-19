@@ -156,19 +156,17 @@ typedef struct {
   float air;   /* 0 on the ground .. 1 in the air */
 } AnimState;
 
-/* scene.c: reads a .glb held in memory. False with a reason in `err`. */
+/* Each reads a .glb held in memory. False with a reason in `err`. */
 bool room_load(Room *r, const void *glb, size_t size, char *err, size_t errn);
 bool player_load(Player *p, const void *glb, size_t size, char *err,
                  size_t errn);
 
-/* anim.c */
 void anim_pose(const Player *p, const AnimState *a, Aff *joint_mtx);
 /* Skins into p->mesh. The lights are unit directions in the player's own
  * space, towards the light; `alpha` scales the model's own. */
 void skin_apply(Player *p, const Aff *joint_mtx, V3 key, V3 fill, float alpha);
 const char *anim_describe(const Player *p);
 
-/* collide.c */
 bool world_build(World *w);
 /* The highest walkable surface under `feet` (sampled over `radius`) no
  * higher than feet.y + up and no lower than feet.y - down, or -1e30. */

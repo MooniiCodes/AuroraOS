@@ -126,6 +126,12 @@ void stereo11_tick(void);
 /* 2D, barrier off and mask clear, for a core about to be parked. */
 void stereo11_off(void);
 
+/* AUDIO_CMD_BRIGHTNESS: level 0..4 on both backlights; the readbacks go in
+ * ct->diag4..7. backlight11_refresh reapplies the level after a 2D/3D
+ * switch, since the top panel needs more drive behind the barrier. */
+void backlight11_set(AudioCtrl *ct, uint32_t level);
+void backlight11_refresh(void);
+
 /* AUDIO_CMD_N3DS: ask for New 3DS clock mode `mode` and report the outcome in
  * ct->n3ds_before, n3ds_after and n3ds_status. */
 void clock11_set(AudioCtrl *ct, uint32_t mode);

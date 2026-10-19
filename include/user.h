@@ -7,7 +7,7 @@
 #define USER_DAT_PATH     "Aurora/USER.dat"
 #define USER_DAT_DIR      "Aurora"
 #define USER_DAT_MAGIC    "ADAT"    /* 4 bytes, not NUL-terminated on disk */
-#define USER_DAT_VERSION  2         /* 2 added the touch calibration        */
+#define USER_DAT_VERSION  3         /* 3 added the brightness               */
 #define USER_DAT_SIZE     64        /* fixed on-disk record size            */
 #define USER_NAME_MAX     24        /* incl. NUL terminator                 */
 
@@ -19,6 +19,9 @@
 /* Offset of the clock offset (Settings > Clock): minutes as a little-endian
  * int16. Older files have zeros here, which is no offset. */
 #define USER_DAT_CLOCK    49
+
+/* Offset of the brightness level (0..4). Older files have a zero here, the
+ * darkest level, so it is read only from version 3 files. */
 #define USER_DAT_BRIGHTNESS 51
 
 enum {

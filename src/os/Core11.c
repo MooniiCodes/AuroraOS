@@ -31,6 +31,59 @@ static void crash11_init(void) {
   __asm__ volatile("mcr p15, 0, %0, c7, c10, 4" ::"r"(0)); /* DSB            */
 }
 
+/* Each panel's LCD block (3dbrew "LCD Registers"): +0x00 bit 0 turns ABL on,
+ * +0x40 is the backlight PWM duty (bits 0-9, 0 is off), +0x44 the period
+ * minus one (bits 0-9) with bit 16 the enable. */
+#define LCD_TOP        0x10202200u
+#define LCD_BOT        0x10202A00u
+#define LCD_FLAGS(b)   MMIO32((b) + 0x00u)
+#define LCD_BL_DUTY(b) MMIO32((b) + 0x40u)
+#define LCD_BL_PWM(b)  MMIO32((b) + 0x44u)
+#define LCD_ABL_ON     (1u << 0)
+#define LCD_BL_PWM_EN  (1u << 16)
+#define LCD_BL_PERIOD  575u /* the 0x1023E that boot code and libn3ds set */
+
+int stereo11_is3d(void);
+
+/* Duty per level for 20, 43, 73, 95 and 117 cd/m2 (the 3DS's five steps),
+ * from libn3ds's default calibration (launch-day Old 3DS): a quadratic per
+ * panel, divided by 512 / 575. The top panel needs less drive than the
+ * bottom one in 2D and more in 3D. */
+static const uint16_t bl_top2d[5] = {15, 33, 57, 75, 94};
+static const uint16_t bl_top3d[5] = {36, 80, 140, 187, 237};
+static const uint16_t bl_bot[5]   = {32, 71, 123, 162, 203};
+static int bl_level = -1;
+
+static void bl_panel(uint32_t base, uint32_t duty) {
+  uint32_t pwm = LCD_BL_PWM(base);
+  if (!(pwm & LCD_BL_PWM_EN)) {
+    pwm = LCD_BL_PWM_EN | (LCD_BL_PERIOD - 1u);
+    LCD_BL_PWM(base) = pwm;
+  }
+  /* With ABL on the hardware moves the duty with the picture, so a set level
+   * would not hold; libn3ds turns it off for the same reason. */
+  LCD_FLAGS(base) &= ~LCD_ABL_ON;
+  LCD_BL_DUTY(base) =
+      (duty * ((pwm & 0x3FFu) + 1u) + LCD_BL_PERIOD / 2u) / LCD_BL_PERIOD;
+}
+
+void backlight11_refresh(void) {
+  if (bl_level < 0)
+    return;
+  bl_panel(LCD_TOP, (stereo11_is3d() ? bl_top3d : bl_top2d)[bl_level]);
+  bl_panel(LCD_BOT, bl_bot[bl_level]);
+  dsb();
+}
+
+void backlight11_set(AudioCtrl *ct, uint32_t level) {
+  bl_level = (int)(level > 4u ? 4u : level);
+  backlight11_refresh();
+  ct->diag4 = LCD_FLAGS(LCD_TOP);
+  ct->diag5 = LCD_BL_DUTY(LCD_TOP);
+  ct->diag6 = LCD_BL_PWM(LCD_TOP);
+  ct->diag7 = LCD_BL_DUTY(LCD_BOT);
+}
+
 /* This core's MPCore private timer, used one-shot. Clock11.c borrows it and
  * puts it back. */
 #define PTIMER_LOAD  0x17E00600u
@@ -134,9 +187,8 @@ void audio11_main(void) {
   touch11_init();
 
   for (;;) {
-    /* The system menu lives on this core and is not part of either app
-     * runtime. Poll before taking a pending command so an app waiting for a
-     * present is held at a clean call boundary while the overlay is open. */
+    /* Polled before a pending command is taken, so an app waiting on its
+     * present stays held there while the menu is open. */
     if (++menu_tick >= 16) {
       menu_tick = 0;
       system_menu11_poll();
@@ -157,15 +209,8 @@ void audio11_main(void) {
           gpu11_run();
         else if (cmd == AUDIO_CMD_N3DS)
           clock11_set(ct, arg0);
-        else if (cmd == AUDIO_CMD_BRIGHTNESS) {
-          /* The PWM register takes calibrated luminance, not the menu index.
-           * These are the five stock 3DS brightness presets. */
-          static const uint16_t levels[5] = { 20, 43, 73, 95, 117 };
-          uint32_t value = levels[arg0 > 4u ? 4u : arg0];
-          MMIO32(0x10202240u) = value;
-          MMIO32(0x10202A40u) = value;
-          dsb();
-        }
+        else if (cmd == AUDIO_CMD_BRIGHTNESS)
+          backlight11_set(ct, arg0);
         else if (cmd == AUDIO_CMD_RUN11)
           run11(ct, arg0, ct->arg1);
         else if (cmd == AUDIO_CMD_PARK)

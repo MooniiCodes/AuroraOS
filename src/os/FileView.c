@@ -5,6 +5,7 @@
 #include "anim.h"
 #include "assets.h"
 #include "ff.h"
+#include "homemenu.h"
 #include "image.h"
 #include "lang.h"
 #include "touch.h"
@@ -990,7 +991,9 @@ static int hex_edit_run(const char *path, const char *name) {
     }
 
     if ((k & BUTTON_B) || close) {
-      if (hx_edits) {
+      /* The confirm would only see more Back requests and keep the edits,
+       * so Return to Home discards them. */
+      if (hx_edits && !home_navigation_requested()) {
         hx_count_text(s, "", " not saved");
         if (!fv_confirm("Discard changes?", s, "Discard", "Keep")) {
           hx_draw_bottom();

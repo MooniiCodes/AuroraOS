@@ -110,9 +110,12 @@ Pressing L + Down + Select opens Aurora's system menu in apps launched from
 the Home Menu. The resident ARM11 system service owns the chord and draws the
 overlay independently of the app's input and rendering loops. Updated C
 runtimes hide pad input from the app while the menu is open. Return to Home is
-delivered to this runtime at SDK boundaries, so rebuild existing `.bin` files
-with `sdk/aurcc.py` to include the return-request handler. Power off and Cancel
-are handled by the resident service itself.
+delivered to this runtime at SDK boundaries: at start the runtime tells the
+core it handles it (`app_caps`), and the core then passes it on, after which
+the app leaves through `exit()` as HOME does. An app built with an older SDK
+gets a "press HOME" notice instead, so rebuild existing `.bin` files with
+`sdk/aurcc.py`. Power off and Cancel are handled by the resident service
+itself.
 
 HOME is noticed in `app_loop()`, `hid_scan()`, `hid_wait()` and `sys_sleep()`;
 a long computation that calls none of them does not respond to it until it

@@ -14,7 +14,7 @@
 
 /* audio_boot() replaces a running core whose version differs, so bump this on
  * any core change. */
-#define AUDIO_CORE_VERSION 118
+#define AUDIO_CORE_VERSION 119
 
 /* The first core that understands AUDIO_CMD_PARK. An older one can only be
  * replaced by powering the console off. */
@@ -22,7 +22,7 @@
 
 /* The first core that runs AUDIO_CMD_RUN11, and takes AUDIO_CMD_N3DS mode 0
  * (back to 268 MHz). */
-#define AUDIO_RUN11_VERSION 117
+#define AUDIO_RUN11_VERSION 116
 
 /* AUDIO_CMD_PARK copies the mailbox wait here and runs it, clear of the core
  * image so the ARM9 can load a new core over the old one. */
@@ -59,7 +59,8 @@ enum {
                              /* in and out through WifiNetIo (wifi.h)         */
   AUDIO_CMD_RUN11 = 13,      /* arg0 = ARM11 code in FCRAM, called with arg1, */
                              /* caches and VFP on meanwhile (Run11.c)         */
-  AUDIO_CMD_BRIGHTNESS = 14, /* arg0 = brightness level 0..4                  */
+  AUDIO_CMD_BRIGHTNESS = 14, /* arg0 = brightness level 0..4; the LCD        */
+                             /* readbacks come back in diag4..7               */
 };
 
 enum {

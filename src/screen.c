@@ -182,9 +182,13 @@ void draw_string(volatile u8 *fb, int x, int y, int screen_height,
         else if (cp == 0xD9u || cp == 0xDAu || cp == 0xDBu || cp == 0xDCu) { mark = cp == 0xD9u ? 1 : cp == 0xDAu ? 2 : cp == 0xDBu ? 6 : 7; cp = 'U'; }
         else if (cp == 0xF9u || cp == 0xFAu || cp == 0xFBu || cp == 0xFCu) { mark = cp == 0xF9u ? 1 : cp == 0xFAu ? 2 : cp == 0xFBu ? 6 : 7; cp = 'u'; }
         else if (cp == 0xDDu) { cp = 'Y'; mark = 2; }
-        else if (cp == 0xFDu || cp == 0xFFu) { cp = 'y'; mark = cp == 0xFFu ? 7 : 2; }
-      } else {
+        else if (cp == 0xFDu || cp == 0xFFu) { mark = cp == 0xFFu ? 7 : 2; cp = 'y'; }
+`      } else {
         str++;
+        /* Any other UTF-8 continuation byte: its lead byte already took the
+         * cell, so a character the font lacks leaves one gap, not several. */
+        if ((cp & 0xC0u) == 0x80u)
+          continue;
       }
       draw_char(fb, cx, y, screen_height, (char)cp, fg, bg);
       if (mark == 1) { draw_pixel(fb, cx + 3, y, screen_height, fg); draw_pixel(fb, cx + 4, y + 1, screen_height, fg); }

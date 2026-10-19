@@ -80,6 +80,8 @@ int wifi_direct_off(void) {
   return 1;
 }
 
+int wifi_direct_active(void) { return direct; }
+
 int wifi_wait(void (*tick)(u32 ms), u32 max_ms) {
   u32 t0 = timer_ticks(), shown = 0xFFFFFFFFu;
   for (;;) {

@@ -97,8 +97,8 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_STOPPED      */ {"Stopped", "Detenido", "Arr\u00EAt\u00E9"},
     /* STR_DEBUG_CRASH  */
     {"Force Debug Crash", "Forzar Fallo", "Forcer un Crash"},
-    /* STR_RESET */
-    {"Reset", "Reiniciar", "R\\u00E9initialiser"},
+    /* STR_RESET        */
+    {"Reset", "Restablecer", "R\u00E9initialiser"},
     /* STR_WIFI_TEST    */ {"Wi-Fi Test", "Prueba de Wi-Fi", "Test Wi-Fi"},
     /* STR_GPU_TEST     */ {"GPU Test", "Prueba de GPU", "Test GPU"},
     /* STR_VERSION      */ {"Version", "Versi\u00F3n", "Version"},
@@ -166,7 +166,7 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_FOLDER       */ {"Folder", "Carpeta", "Dossier"},
     /* STR_HOME         */ {"Home", "Inicio", "Accueil"},
     /* STR_RETURN_HOME  */ {"Return to Home", "Volver al inicio",
-                            "Retourner à l'accueil"},
+                            "Retourner \u00E0 l'accueil"},
     /* STR_ITEM         */ {"item", "elemento", "\u00E9l\u00E9ment"},
     /* STR_ITEMS        */ {"items", "elementos", "\u00E9l\u00E9ments"},
     /* STR_MOVE         */ {"Move", "Mover", "D\u00E9placer"},
@@ -1093,7 +1093,7 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_ABOUT_SCROLL_HINT */ {"D-pad / swipe: scroll   B: back",
                                  "D-pad / deslizar: mover   B: volver",
                                  "Fl\u00E8ches / glisser : d\u00E9filer   B : retour"},
-    /* STR_RESET_ASK */ {"Reset Aurora settings?", "\u00BFAjustes de Aurora?",
+    /* STR_RESET_ASK */ {"Reset Aurora settings?", "\u00BFRestablecer Aurora?",
                          "R\u00E9initialiser Aurora ?"},
     /* STR_RESET_HINT */ {"A: Delete USER.dat   B: Cancel",
                           "A: Borrar USER.dat   B: Cancelar",
@@ -1104,6 +1104,14 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_RESET_FAILED */ {"Could not delete USER.dat",
                             "No se pudo borrar USER.dat",
                             "Impossible de supprimer USER.dat"},
+    /* STR_BRIGHT_HINT */
+    {"Both screens. Aurora sets it again at every start.",
+     "Ambas pantallas. Aurora lo aplica en cada inicio.",
+     "Les deux \u00E9crans. Aurora le r\u00E8gle \u00E0 chaque d\u00E9marrage."},
+    /* STR_BRIGHT_KEYS */
+    {"Left/Right: change  A: Save  B: Back",
+     "Izq./Der.: cambiar  A: Guardar  B: Volver",
+     "Gauche/Droite : changer  A : OK  B : Retour"},
 };
 
 const char *L(StringId id) {
@@ -1667,6 +1675,10 @@ int keyboard_edit(char *name, int size, int mode, const char *hint,
     u32 k = get_keys_down();
     int changed = 0;
     int orow = row, ocol = col, ocaps = caps, olen = len;
+
+    /* B is backspace here; leave as SELECT does for the system menu. */
+    if (home_navigation_requested())
+      return 0;
 
     if (k & BUTTON_DUP) {
       row = (row > 0) ? row - 1 : 4;
@@ -2292,7 +2304,8 @@ int user_config_load(UserConfig *cfg) {
     if (cfg->clock_offset <= -1440 || cfg->clock_offset >= 1440)
       cfg->clock_offset = 0;
   }
-  if (br > USER_DAT_BRIGHTNESS && s_buf[USER_DAT_BRIGHTNESS] <= 4)
+  if (br > USER_DAT_BRIGHTNESS && s_buf[4] >= 3 &&
+      s_buf[USER_DAT_BRIGHTNESS] <= 4)
     cfg->brightness = s_buf[USER_DAT_BRIGHTNESS];
 
   if (cfg->language >= LANG_COUNT)

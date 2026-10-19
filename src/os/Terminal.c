@@ -8,6 +8,7 @@
 #include "container.h"
 #include "files.h"
 #include "font.h"
+#include "homemenu.h"
 #include "model.h"
 #include "timer.h"
 #include "touch.h"
@@ -1185,7 +1186,8 @@ static void terminal_run(const char *user, void (*launch)(const char *path)) {
     u32 k = get_keys_down();
     int tx, ty, hx, hy, ev = -1;
 
-    if (k & BUTTON_START)
+    /* B is Del here, so the system menu's Back requests cannot close it. */
+    if ((k & BUTTON_START) || home_navigation_requested())
       break;
 
     if (touch_tap(&tx, &ty)) {

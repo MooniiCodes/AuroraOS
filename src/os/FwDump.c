@@ -13,6 +13,7 @@
 #include "aes.h"
 #include "anim.h"
 #include "ff.h"
+#include "homemenu.h"
 #include "image.h"
 #include "lang.h"
 #include "nand.h"
@@ -606,7 +607,9 @@ static int code_run(void) {
     u32 k = get_keys_down(), b;
     k &= ~held; /* a held direction repeats; only new presses count */
     held = get_keys();
-    if (k & (BUTTON_SELECT | BUTTON_START))
+    /* B is one of the code's buttons, so the system menu's Back requests
+     * would only restart the code. */
+    if ((k & (BUTTON_SELECT | BUTTON_START)) || home_navigation_requested())
       return 0;
     if (touch_tap(&tx, &ty) &&
         touch_in(tx, ty, CANCEL_X, CANCEL_Y, CANCEL_W, CANCEL_H))

@@ -74,8 +74,8 @@ os_cache_sync:
 .type os_return_stub, %function
 os_return_stub:
     @ Stop the resident ARM11 hotkey before the OS image is restored. The
-    @ control fields occupy separate 32-byte cache lines (active, visible,
-    @ action).
+    @ control fields occupy separate 32-byte cache lines (app_active,
+    @ menu_open, action).
     ldr   r5, =SYSMENU_CTRL
     mov   r6, #0
     str   r6, [r5]

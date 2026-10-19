@@ -92,6 +92,48 @@ static void menu_draw(int frame, int selected, int confirm) {
             confirm ? "A: Select   B: Back" : "A: Select   B: Close", cyan);
 }
 
+/* The return stub clears app_active. An app built before Beta 7 still polls
+ * HOME while the menu is up and can leave that way; the OS then starts again
+ * and probes this core, so the menu has to go at once. */
+static int app_gone(void) {
+  volatile AuroraSystemMenuShared *shared = aurora_system_menu_shared();
+  dcache_inval_line((const void *)&shared->app_active);
+  return !shared->app_active;
+}
+
+/* For an app whose runtime does not act on Return to Home (no app_caps). */
+static void menu_notice(int frame) {
+  volatile uint8_t *fb = framebuffer(frame);
+  const uint32_t cyan = 0x64E8C8u;
+  const uint32_t white = 0xFFFFFFu;
+  static const char *const lines[] = {
+      "This app was built before Beta 7,",
+      "so it cannot be closed from here.",
+      "Close this menu and press HOME,",
+      "or rebuild the app with the new",
+      "C SDK or Auric compiler."};
+  uint32_t previous;
+
+  menu_fill(fb, 0);
+  menu_text(fb, 8, 8, "Aurore Tools", cyan);
+  for (unsigned i = 0; i < sizeof(lines) / sizeof(lines[0]); i++)
+    menu_text(fb, 8, 32 + (int)i * 12, lines[i], white);
+  menu_text(fb, 8, BOT_HEIGHT - 16, "A or B: Back", cyan);
+  gpu11_menu_show(frame);
+  while ((menu_keys() & (KEY_A | KEY_B)) && !app_gone())
+    sleep_ms(16);
+  previous = menu_keys();
+  while (!app_gone()) {
+    uint32_t current = menu_keys();
+    uint32_t down = current & ~previous;
+    previous = current;
+    if (down & (KEY_A | KEY_B))
+      return;
+    stereo11_tick();
+    sleep_ms(16);
+  }
+}
+
 static int menu_confirm_power(int frame) {
   uint32_t previous;
   int selected = 1;
@@ -103,6 +145,8 @@ static int menu_confirm_power(int frame) {
   for (;;) {
     uint32_t current = menu_keys();
     uint32_t down = current & ~previous;
+    if (app_gone())
+      return 0;
     previous = current;
     if (down & KEY_UP)
       selected ^= 1;
@@ -141,6 +185,8 @@ static void menu_run(void) {
     uint32_t current = menu_keys();
     uint32_t down = current & ~previous;
     int old = selected;
+    if (app_gone())
+      break;
     previous = current;
     if (down & KEY_UP)
       selected = selected > 0 ? selected - 1 : 2;
@@ -150,9 +196,16 @@ static void menu_run(void) {
       break;
     if (down & KEY_A) {
       if (selected == 0) {
-        shared->action = AURORA_SYSTEM_MENU_HOME;
-        dcache_clean_line((const void *)&shared->action);
-        break;
+        if (shared->app_caps & AURORA_SYSTEM_MENU_CAP_HOME) {
+          shared->action = AURORA_SYSTEM_MENU_HOME;
+          dcache_clean_line((const void *)&shared->action);
+          break;
+        }
+        menu_notice(frame);
+        menu_draw(frame, selected, 0);
+        gpu11_menu_show(frame);
+        previous = menu_keys();
+        continue;
       }
       if (selected == 1) {
         if (menu_confirm_power(frame))
@@ -172,7 +225,7 @@ static void menu_run(void) {
     sleep_ms(16);
   }
 
-  while (menu_keys() & 0xFFFu)
+  while ((menu_keys() & 0xFFFu) && !app_gone())
     sleep_ms(16);
   shared->menu_open = 0;
   dcache_clean_line((const void *)&shared->menu_open);

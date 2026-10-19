@@ -1,5 +1,6 @@
 #include "aurora.h"
 #include "audio.h"
+#include "gpu.h"
 #include "timer.h"
 #include "audio11_blob.h" /* generated: audio11_bin[], audio11_bin_len */
 
@@ -177,6 +178,9 @@ void audio_voices_stop(void) {
 
 void audio_set_brightness(uint32_t level) {
   if (level > 4u) level = 4u;
+  /* Settings calls this right after a redraw, whose present may still be in
+   * the one command slot. */
+  gpu_wait_idle();
   if (audio_alive())
     post_wait(AUDIO_CMD_BRIGHTNESS, level);
 }

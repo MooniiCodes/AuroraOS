@@ -29,15 +29,23 @@ static u32 pad(void) {
                        : : "r"(&menu->menu_open) : "memory");
       if (!menu->menu_open)
         break;
-      delay(60000); /* pause an app at its next SDK input boundary */
+      delay(60000);
     }
   }
   return ~REG_HID_PAD & 0xFFFu;
 }
 
 /* Whatever is held as the app starts (the A that launched it) is not a new
- * press. */
-void app_hid_init(void) { g_held = pad(); }
+ * press. Also tells the core's system menu that Return to Home works here. */
+void app_hid_init(void) {
+  g_held = pad();
+  if (app_from_home()) {
+    volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+    menu->app_caps = AURORA_SYSTEM_MENU_CAP_HOME;
+    os_dcache_clean_range((const void *)&menu->app_caps,
+                          sizeof(menu->app_caps));
+  }
+}
 
 bool app_hid_system_menu_open(void) {
   volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
@@ -48,9 +56,8 @@ bool app_hid_system_menu_open(void) {
   return menu->menu_open != 0;
 }
 
-/* The ARM11 system-menu service owns the hotkey and display. The runtime only
- * consumes its Home request at an SDK boundary so cleanup and the existing
- * OS return stub still run normally. */
+/* Return to Home chosen in the core's system menu leaves through exit(), so
+ * the atexit functions and the OS return stub run as they do for HOME. */
 void app_hid_home_menu_poll(void) {
   volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
   if (g_app_leaving || !app_from_home())

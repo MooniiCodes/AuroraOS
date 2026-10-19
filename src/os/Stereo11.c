@@ -189,6 +189,7 @@ void stereo11_mode(int on) {
   }
   set_preset(on);
   in3d = on;
+  backlight11_refresh();
 }
 
 int stereo11_is3d(void) { return in3d; }
