@@ -19,6 +19,7 @@ _start:
     strlt r2, [r0], #4
     blt   .Lbss
 
+    bl    aur_app_start          @ announce Return to Home to the system menu
     bl    au_main                @ Auric `fn main`
     bl    aur_app_return         @ a normal return quits to the Home Menu
 

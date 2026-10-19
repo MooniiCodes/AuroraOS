@@ -179,7 +179,7 @@ u32 get_keys(void) {
       aur_inval_line((const void *)&menu->menu_open);
       if (!menu->menu_open)
         break;
-      delay(60000); /* pause an app at its next Auric input boundary */
+      delay(60000);
     }
   }
   aur_system_menu_request_poll();
@@ -247,6 +247,16 @@ static void aur_system_menu_request_poll(void) {
     os_dcache_clean_range(&menu->action, sizeof(menu->action));
     aur_leave();
   }
+}
+
+/* Called before `fn main`: tells the core's system menu that this runtime
+ * acts on its Return to Home. */
+void aur_app_start(void) {
+  volatile AuroraSystemMenuShared *menu = aurora_system_menu_shared();
+  if (!aur_from_home())
+    return;
+  menu->app_caps = AURORA_SYSTEM_MENU_CAP_HOME;
+  os_dcache_clean_range((const void *)&menu->app_caps, sizeof(menu->app_caps));
 }
 
 /* A normal return from an Auric main is the app's quit action too. */

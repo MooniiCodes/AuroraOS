@@ -9,5 +9,5 @@ dist/
 __pycache__/
 *.pyc
 
-# PyInstaller (Part 2)
+# PyInstaller
 *.spec.bak

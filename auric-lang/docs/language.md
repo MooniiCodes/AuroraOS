@@ -401,10 +401,17 @@ sends a score to httpbin.org with `http_param` and `http_post`.
 
 ### The HOME button
 
-You don't handle HOME yourself: the runtime polls it inside **every** built-in
-call and, when launched from the AuroraOS home menu, returns there instantly on a
-press. Keep a `delay(...)` (or another built-in) in any long-running loop so HOME
-stays responsive. See `../../sample/rainbow.aur`.
+You don't handle HOME yourself: the runtime checks it during built-in calls
+(at least every 12 ms) and, when launched from the AuroraOS home menu, returns
+there on a press. Keep a `delay(...)` (or another built-in) in any long-running
+loop so HOME stays responsive. See `../../sample/rainbow.aur`. Returning from
+`fn main` also goes back to the home menu.
+
+L + Down + Select opens AuroraOS's system menu over the app (drawn by the OS,
+not by your program). While it is open, your program waits at its next button
+read; its Return to Home leaves the app like HOME. Rebuild older apps with this
+runtime for that. `examples/system_menu.aur` uses Down and Select itself to
+show that the chord still reaches the menu.
 
 ### App icons
 
