@@ -170,6 +170,19 @@ typedef struct {
 	BYTE	win[FF_MAX_SS];	/* Disk access window for Directory, FAT (and file data at tiny cfg) */
 } FATFS;
 
+/* State for a sliced free-cluster scan. Zero initialize before the first
+ * f_getfree_step() call; each call scans at most the requested FAT sectors. */
+typedef struct {
+	FATFS *fs;
+	DWORD nfree;
+	DWORD remaining;
+	DWORD cluster;
+	LBA_t sect;
+	UINT offset;
+	WORD id;
+	BYTE active;
+} FFREE_SCAN;
+
 
 
 /* Object ID and allocation information (FFOBJID) */
@@ -324,6 +337,7 @@ FRESULT f_chdir (const TCHAR* path);								/* Change current directory */
 FRESULT f_chdrive (const TCHAR* path);								/* Change current drive */
 FRESULT f_getcwd (TCHAR* buff, UINT len);							/* Get current directory */
 FRESULT f_getfree (const TCHAR* path, DWORD* nclst, FATFS** fatfs);	/* Get number of free clusters on the drive */
+FRESULT f_getfree_step (FATFS* fs, FFREE_SCAN* scan, DWORD* nclst, UINT sector_budget, int* done);
 FRESULT f_getlabel (const TCHAR* path, TCHAR* label, DWORD* vsn);	/* Get volume label */
 FRESULT f_setlabel (const TCHAR* label);							/* Set volume label */
 FRESULT f_forward (FIL* fp, UINT(*func)(const BYTE*,UINT), UINT btf, UINT* bf);	/* Forward data to the stream */
