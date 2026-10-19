@@ -24,7 +24,7 @@ Aurora/Store/new3ds.png
 !Games/**/*.bin
 !Games/**/*.BIN
 
-# Python tool caches (tools/, audio/, images/ scripts)
+# Python caches
 __pycache__/
 *.pyc
 
