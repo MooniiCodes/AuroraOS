@@ -244,8 +244,6 @@ static void btn_rect(int b, int *x, int *y, int *w, int *h) {
     *x = BAR_X + 37;
     *w = back_w();
   } else {
-    /* Center the focus ring on the settings glyph (whose visual bounds are
-     * BW-34..BW-18), rather than on the old, left-shifted hit box. */
     *x = BW - 42;
     *w = 32;
   }
