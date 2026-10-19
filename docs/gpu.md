@@ -25,7 +25,8 @@ Both engines are also reachable from **Settings > GPU Test**.
 
 The PICA200 register block is at `0x10400000`, which is **ARM11 I/O**. The ARM9
 that runs the AuroraOS kernel cannot reach it, exactly as it cannot reach the
-LCD brightness registers at `0x10202xxx`.
+LCD brightness registers at `0x10202xxx` (the core sets those too, from core
+117; see [`power.md`](power.md)).
 
 So the GPU driver follows the same split the audio, Wi-Fi and touchscreen code
 already use: the work happens in the ARM11 core, and the ARM9 posts requests

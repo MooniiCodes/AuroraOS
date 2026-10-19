@@ -74,8 +74,9 @@ Default or Custom.
 
 A kept calibration is in use at once and saved in `SD:\Aurora\USER.dat`. From
 offset 40 the record holds a flag byte and then `x_min`, `x_max`, `y_min` and
-`y_max` as little-endian 16-bit values. That is `USER_DAT_VERSION` 2; a version
-1 file has zeros there and reads as no calibration. At boot a saved calibration
+`y_max` as little-endian 16-bit values. `USER_DAT_VERSION` 2 added it (3, in
+Beta 7, added the brightness at offset 51); a version 1 file has zeros there
+and reads as no calibration. At boot a saved calibration
 that `touch_cal_set()` refuses is ignored.
 
 An Auric app replaces the OS image, calibration included, so its runtime links

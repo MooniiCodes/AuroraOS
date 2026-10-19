@@ -12,16 +12,17 @@
 
   
 
-Aurora is a custom OS for the Nintendo 3DS. **Current version: Beta 6 v0.1.5.**
+Aurora is a custom OS for the Nintendo 3DS. **Current version: Beta 7 v0.1.6.**
 -  *Built using knowledge from GodMode9 and Luma source code.*
 
 ## What works
 
 | Area | State | Notes |
 |------|-------|-------|
-| Home Menu + Settings | working | app grid, accent colours, three languages, About page with More Info (eMMC CID) and credits |
+| Home Menu + Settings | working | app grid, accent colours, three languages, About page with More Info (eMMC CID) and credits; Settings > Reset deletes `USER.dat` so the setup runs again |
 | Home Menu pages and folders | working | up to 12 pages of 15; folders two levels deep; moving apps by dragging or with the D-pad; Power in the bar; saved in `SD:/Aurora/HomeMenu.txt`; see [`docs/home.md`](docs/home.md) |
-| Icons, wallpaper, type | working | real art + Figtree from SD, with accents; see [`docs/assets.md`](docs/assets.md) |
+| System menu | new | **L + Down + Select** on any screen and inside apps: Return to Home, Power Off, Cancel ("Aurore Tools"). In apps the ARM11 core draws it; Return to Home works in apps built with the Beta 7 runtimes (C SDK 1.2, Auric), and an older app says to press HOME instead; see [`docs/home.md`](docs/home.md) |
+| Icons, wallpaper, type | working | real art + Figtree from SD, with accents (the built-in 8x8 font draws accented letters too); a message at boot when `assets.pak` is missing or does not match; see [`docs/assets.md`](docs/assets.md) |
 | File Explorer | working | browse the card, per-type icons, TXT/LOG viewer, hex editor; see [`docs/files.md`](docs/files.md) |
 | File operations | working | copy, move, rename, delete and new folder, with long file names |
 | Screenshots | working | L+R saves both screens as a BMP; see [`docs/input.md`](docs/input.md) |
@@ -35,14 +36,15 @@ Aurora is a custom OS for the Nintendo 3DS. **Current version: Beta 6 v0.1.5.**
 | GPU (PICA200) | working | PSC fill + PPF blit, verified on hardware |
 | Audio | working | ARM11 CSND core, eight voices for apps; see [`docs/audio.md`](docs/audio.md) |
 | Touchscreen | working | CTR codec on the ARM11, with calibration in Settings |
-| Circle pad | working | read from the same codec by the ARM11 core; see [`docs/input.md`](docs/input.md) |
+| Circle pad | working | read from the same codec by the ARM11 core; also moves the selection in every menu, like the D-pad; see [`docs/input.md`](docs/input.md) |
 | 3D models (GLB) | working on a New 3DS | **3D Model** on the Home Menu shows `SD:/Aurora/model.glb` with its textures: circle pad orbits, D-pad pans, Y and A zoom; the nearest part sets the 3D depth and is named on the bottom screen; see [`docs/glb.md`](docs/glb.md) |
 | 3D (GPU) | working on a New 3DS | the PICA200's 3D pipeline from command lists, with vertex buffers and mipmapped textures; see [`docs/stereo3d.md`](docs/stereo3d.md) |
 | 3D (software) | working | the ARM9 renderer, which draws the model viewer's fallback cube; see [`docs/soft3d.md`](docs/soft3d.md) |
 | Stereoscopic 3D screen | working on a New 3DS | the 3D slider puts the top screen in 3D, with the parallax barrier on every 3DS model (and the New 3DS's movable mask); Old 3DS untested; see [`docs/stereo3d.md`](docs/stereo3d.md) |
 | ARM11 core updates | working | a core from another build is swapped out without a power-off, from core 83 on; see [`docs/audio.md`](docs/audio.md) |
 | Clock + battery | working | MCU over I2C, with Aurora's own clock offset in Settings > Clock (the RTC is never written); see [`docs/power.md`](docs/power.md) |
-| Console model | working | New/Old from CFG11_SOCINFO; "N" in the status bar |
+| Screen brightness | new | Settings > Brightness: five levels on both backlights, calibrated per panel (and for the top in 3D), set by the ARM11 core (core 119) and kept in `USER.dat`; see [`docs/power.md`](docs/power.md) |
+| Console model | working | New/Old from CFG11_SOCINFO ("New 3DS/2DS", "Old 3DS/2DS"); "N" in the status bar |
 | Crash handler | working | register dump plus a three-beep error tone on a fault |
 | Apps ([Auric](auric-lang/README.md)) | working | sound from the SD card; drawing on the bottom screen and touch input (Auric v0.4, works on a New 3DS, 2026-10-05); the network (Auric v0.5: HTTP and JSON, works on a New 3DS, 2026-10-08); see [`docs/apps.md`](docs/apps.md) |
 | Apps in C ([SDK](sdk/README.md)) | new | `#include <aurora_app.h>`: both screens, shapes, the Figtree fonts, PNG/JPEG/BMP images, buttons, touch, circle pad, sound, files, clock, the network (HTTP over the saved Wi-Fi network); the C library through newlib (`printf` on screen, `malloc`, `fopen` on the SD card); built by `sdk/aurcc.py` into `AURC` apps (the `AUR1` container with its own magic, so Aurora knows a C app) that go in `SD:/Aurora/Apps/C` and keep their data in `SD:/Aurora/Apps/C/<Name>`, which Aurora makes; HOME and crashes return to the Home Menu. Published on aShop like Auric apps. Checked on a PC against stubbed hardware; one C app, the CPU stress test, ran on a New 3DS (2026-10-08), the examples are untested on a console |
@@ -70,12 +72,16 @@ ARM9 runs the OS; the ARM11 handles the hardware the ARM9 cannot reach.
 | Stereoscopic top screen | `src/os/Stereo9.c` (slider, model) | `src/os/Stereo11.c` (mode, barrier) |
 | Codec bus (shared by audio + touch) | | `src/os/Codec11.c` |
 | Core entry and command loop | | `src/os/Core11.c` |
+| System menu (L + Down + Select) | `src/os/HomeMenu.c` (`home_system_menu`, OS screens) | `src/os/SystemMenu11.c` (inside apps) |
+| Screen brightness | `src/os/Audio9.c` (`audio_set_brightness`) | `src/os/Core11.c` |
 | New 3DS clock switch | `src/model.c` | `src/os/Clock11.c` |
 | An app's code on the ARM11 (`AUDIO_CMD_RUN11`) | the app posts it | `src/os/Run11.c` |
 
 The ARM11 files link into one core binary, which the ARM9 embeds and wakes;
-`src/os/core11.h` carries what they share. ARM9-only modules keep plain names:
-`src/screen.c`, `src/power.c`, `src/i2c.c`, `src/sdmmc.c`, `src/os/Timer9.c`,
+`src/os/core11.h` carries what they share; `src/power.c` and `src/i2c.c` are
+built into the core as well, for the system menu's Power Off. ARM9-only
+modules keep plain names: `src/screen.c`, `src/power.c`, `src/i2c.c`,
+`src/sdmmc.c`, `src/os/Timer9.c`,
 `src/assets.c`, `src/ui.c`, `src/image.c`, `src/jpeg.c`, `src/wav.c`,
 `src/wavload.c`, `src/model.c`, the status bar in `src/os/StatusBar.c`, the File
 Explorer in `src/os/Files.c` with its viewers in `src/os/FileView.c` and its
@@ -112,7 +118,7 @@ loaded at boot by `src/assets.c`. Run `make assets` after changing either.
 * [`docs/input.md`](docs/input.md): touch calibration, the circle pad and screenshots
 * [`docs/terminal.md`](docs/terminal.md): the terminal, its keys and every command
 * [`docs/gpu.md`](docs/gpu.md): PICA200 driver and the rendering path
-* [`docs/home.md`](docs/home.md): the Home Menu: pages, folders, moving apps, the layout file
+* [`docs/home.md`](docs/home.md): the Home Menu: pages, folders, moving apps, the layout file, the system menu
 * [`docs/store.md`](docs/store.md): aShop, the store: opening it, screens, downloads, the catalogue, publishing apps
 * [`docs/account.md`](docs/account.md): Aurora accounts: linking and creating one, the token file, the console's HTTP and TCP client
 * [`docs/glb.md`](docs/glb.md): the 3D Model screen and the GLB loader: what it reads, limits, textures, memory
@@ -120,7 +126,7 @@ loaded at boot by `src/assets.c`. Run `make assets` after changing either.
 * [`docs/stereo3d.md`](docs/stereo3d.md): the 3D screen, the parallax barrier and the PICA200's 3D pipeline
 * [`docs/ui.md`](docs/ui.md): rounded shapes, screen transitions and animation
 * [`docs/audio.md`](docs/audio.md): CSND playback and the channel registers
-* [`docs/power.md`](docs/power.md): MCU real-time clock, battery, power off and reboot
+* [`docs/power.md`](docs/power.md): MCU real-time clock, battery, power off and reboot, screen brightness
 * [`docs/wifi.md`](docs/wifi.md): Wi-Fi bring-up, state and findings, and copying the firmware from the console
 * [`auric-lang/README.md`](auric-lang/README.md): the Auric language and compiler
 * [`sdk/README.md`](sdk/README.md): writing apps in C: the API, the C library, memory, building with `aurcc.py`, publishing on aShop

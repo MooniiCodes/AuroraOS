@@ -224,6 +224,31 @@ on a New 3DS at 804 MHz (2026-10-08).
 `AUDIO_CMD_N3DS` takes mode 0 from core 116 too, to go back to 268 MHz; it
 leaves the L2 controller's power and the GPU's New 3DS bits as they are.
 
+## Brightness and the system menu
+
+Two later jobs have nothing to do with sound, but they are ARM11 work, so they
+live in the core too:
+
+- **Core 117**, `AUDIO_CMD_BRIGHTNESS` (14): `arg0` is a level from 0 to 4.
+  From core 119 the core turns ABL off, makes sure the PWM is enabled, writes
+  a calibrated duty per panel (another one for the top in 3D), and copies the
+  registers back into `diag4` to `diag7`. See [`power.md`](power.md),
+  "Screen brightness".
+- **Core 118**, the system menu inside apps (`src/os/SystemMenu11.c`). Every 16
+  passes of the command loop, before it looks for a command, the core reads
+  the buttons. While an app started from the Home Menu runs (`app_active` in
+  the block at `0x233A8000`, `include/system_menu.h`), L + Down + Select opens
+  the menu on the bottom screen. The core takes no command while the menu is
+  open, and it can power off by itself, because `src/i2c.c` and `src/power.c`
+  are linked into it. From core 119 it offers Return to Home only to an app
+  whose runtime set `app_caps`, and it closes the menu as soon as
+  `app_active` drops (an older app left by HOME meanwhile), so the restarting
+  OS's probe is answered. See [`home.md`](home.md), "The system menu".
+
+The core links those two shared files, `include/font.h` and
+`include/system_menu.h`, so a change to any of them is a core change and needs
+an `AUDIO_CORE_VERSION` bump.
+
 ## Audio files
 
 `.aaf` is a 16-byte header (`AAF1`, version, channels, bit depth, reserved,

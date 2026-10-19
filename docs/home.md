@@ -5,8 +5,9 @@
 | The menu: drawing, input, moving, menus | `src/os/HomeMenu.c`, `include/homemenu.h` |
 | The arrangement and its file | `src/os/HomeLayout.c`, `include/homelayout.h` |
 | The apps it shows, and what opening one does | `src/os/os_main.c` (`scan_apps`, `build_home`, `home_open`) |
+| The system menu (L + Down + Select) | `src/os/HomeMenu.c` (`home_system_menu`), `get_keys_down()` in `src/os/os_main.c`; in apps `src/os/SystemMenu11.c` and `include/system_menu.h` |
 | Strings, in English, Spanish and French | `src/os/os_setup.c`, `include/lang.h` |
-| Folder icon | `icons/Folder.png` (`ASSET_ICON_FOLDER_*`), `icon_folder_bits` in `include/icons.h` |
+| Folder icon | `icons/folder-icon-without-text.png` (`ASSET_ICON_FOLDER_*`), `icon_folder_bits` in `include/icons.h` |
 
 **Status: working on a New 3DS** (2026-10-03). Every behaviour below was also
 run on the PC through the harness; see "What has been checked".
@@ -18,7 +19,7 @@ The bottom screen has a bar along the top and a grid of 5 x 3 tiles under it.
 | Part | Does |
 |------|------|
 | Power icon, left of the bar | asks "Turn off the console?", then powers off |
-| L + Down + Select | opens the system menu with Return to Home, Power Off and Cancel |
+| L + Down + Select | opens the system menu (Return to Home, Power Off, Cancel), on every screen and in apps; see "The system menu" |
 | `< Name`, inside a folder | back to where the folder is |
 | Settings icon, right of the bar | opens Settings, as START does |
 | Grid | SD apps (from `SD:/Aurora/Apps`, and C apps from `SD:/Aurora/Apps/C`), Music, Files, 3D Model, aShop and folders |
@@ -59,12 +60,14 @@ icon when it is empty.
 | Button | Does |
 |--------|------|
 | D-pad | moves the selection; past the left or right edge it turns the page; up from the top row goes to the bar |
+| Circle pad | the same as the D-pad, here and in every list and menu of the OS |
 | L / R | previous / next page |
 | A | opens the app or folder; on the bar, presses that button |
 | B | in a folder, back out of it; on the bar, back to the grid |
 | Y | the action menu for the selected tile or empty slot |
 | X | the terminal |
 | START | Settings |
+| L + Down + Select | the system menu |
 
 ### Touch
 
@@ -85,6 +88,73 @@ icon when it is empty.
 | New Folder | asks for a name, then puts the tile in a new folder in its place (on an empty slot, makes an empty folder) |
 | Rename | a folder's name, on the keyboard |
 | Remove Folder | after asking, if it is not empty: what it holds goes where the folder was |
+
+## The system menu
+
+Pressing **L + Down + Select** together opens "Aurore Tools" on the bottom
+screen, wherever you are: the Home Menu, Settings, Files, aShop, the terminal,
+the setup wizard, or an app started from the Home Menu. The D-pad (or a tap)
+picks a row, A chooses it, B closes the menu.
+
+| Row | Does |
+|-----|------|
+| Return to Home | leaves every screen you are in and shows the Home Menu |
+| Power Off | asks, then turns the console off |
+| Cancel | closes the menu; the screen underneath is as it was |
+
+Return to Home is left out before the Home Menu has started, in the setup
+wizard and at the asset-pack warning, since there is no Home to go back to
+yet. The chord does nothing while Settings > Wi-Fi or the Wi-Fi Test waits for
+a Wi-Fi command, because the ARM11 core is busy and cannot present the menu.
+
+### In the OS
+
+`get_keys_down()` in `src/os/os_main.c` is the input path of every screen, so
+it catches the chord there and calls `home_system_menu()`. That copies the
+bottom framebuffer, draws the menu, and puts the copy back on Cancel.
+
+Return to Home sets a request instead of jumping: until the Home Menu clears
+it, `get_keys_down()` returns only **B**, and `anim_transition()` skips the
+slide back. Each screen then leaves the way B normally makes it leave, closing
+its files and saving what it saves, and the Home Menu's loop
+(`home_navigation_requested()`) clears the request and redraws. A few screens
+use B for something else, so they check the request themselves:
+
+| Screen | B there | On Return to Home |
+|--------|---------|-------------------|
+| Terminal | Del | closes, as START does |
+| On-screen keyboard (names, passwords, search) | backspace | cancels, as SELECT does |
+| Wi-Fi firmware copy, the button code | one of the code's buttons | cancels |
+| Hex editor with unsaved changes | asks "Discard changes?" | discards them without asking |
+| Files | up one folder | goes up folder by folder, then leaves |
+
+### In apps
+
+An app has its own input loop, so the menu there is part of the ARM11 core
+(`src/os/SystemMenu11.c`, from core 118). While an app started from the Home
+Menu runs, the core reads the buttons itself, and on the chord draws the menu
+in English with the 8x8 font into a spare bottom framebuffer and shows it. The
+app's frame comes back when it closes. Power Off (with a Yes / Back question)
+and Cancel are handled by the core, so they work in any app.
+
+Return to Home cannot be done by the core alone. The app runs on the ARM9
+with interrupts masked, so nothing on the ARM11 can take the ARM9 out of it;
+only the app's own runtime can leave. The runtimes from Beta 7 (the C SDK 1.2
+and the Auric runtime of the same release) do this. At start they set
+`app_caps` in the block at `0x233A8000` (`include/system_menu.h`). The core
+then passes Return to Home to them through `action`, and the runtime leaves by
+the normal HOME path at its next button read or present. While the menu is
+open, they hold the app at its next button read.
+
+An app built before Beta 7 has no `app_caps`. The menu still opens over it,
+but choosing Return to Home shows "This app was built before Beta 7, so it
+cannot be closed from here", and the way out is HOME, or rebuilding the app.
+Such an app keeps polling HOME while the menu is up. If HOME is pressed then,
+the app leaves and the return stub clears `app_active`; the core sees that
+and closes the menu at once, so the restarting OS finds it answering.
+`Games/Tetris.BIN` is built with the new runtime; the other Auric and C apps
+in this tree get it when they are rebuilt with `aurc` or `sdk/aurcc.py`. An
+app installed from aShop needs a new build from its developer.
 
 ## Moving things
 
@@ -177,7 +247,8 @@ On the PC, with the real menu code, 23 SD apps and scripted buttons and stylus:
   the D-pad Move; the depth rule in the menu, in "Move to..." and while
   dragging; Rename and Remove Folder.
 
-On a New 3DS: all of it works.
+On a New 3DS: all of it works. The system menu and the circle pad came later
+(Beta 7) and were built, but not run in the harness or on a console here.
 
 ## On the console
 
@@ -186,18 +257,20 @@ icon); an older pack is refused, and the menu then draws its built-in icons.
 
 1. The power icon is at the top left of the bottom screen and asks before
    turning off. There is no Power Off tile.
-   Press L + Down + Select to open the system menu. The resident ARM11 service
-   handles the overlay during apps; rebuild existing C and Auric `.bin` files
-   with their updated runtime for the Return to Home action.
-2. With more than fifteen apps the dots appear; swipe or press L/R.
-3. Hold a tile, drag it, and let go somewhere else. Drag one onto the middle
+2. Press L + Down + Select in Settings > About and choose Return to Home; do
+   the same in the terminal, in a rebuilt app (`Games/Tetris.BIN`), and in the
+   keyboard of New Folder.
+   Each should end on the Home Menu.
+3. With more than fifteen apps the dots appear; swipe or press L/R.
+4. Hold a tile, drag it, and let go somewhere else. Drag one onto the middle
    of another app to make a folder.
-4. Y on a tile: New Folder, Rename, Move to..., Remove Folder.
-5. Power off and back on: the arrangement is as you left it.
+5. Y on a tile: New Folder, Rename, Move to..., Remove Folder.
+6. Power off and back on: the arrangement is as you left it.
 
 | Symptom | Likely cause |
 |---------|--------------|
 | Holding a tile never picks it up | the stylus wanders more than 8 pixels while held: `SLOP` in `HomeMenu.c` |
 | Taps open the wrong tile | touch calibration (Settings > Touch Calibration) |
 | Every arrangement is lost at power-off | the file could not be written: is the card read-only? |
-| Icons look like plain shapes | an older `assets.pak` on the card |
+| Icons look like plain shapes | an older `assets.pak` on the card (a boot message says it was not loaded) |
+| Return to Home in an app says "This app was built before Beta 7" | rebuild it with `sdk/aurcc.py` or `aurc`; HOME still works |

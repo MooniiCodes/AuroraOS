@@ -258,7 +258,28 @@ ignores HOME, so nothing branches into an uninstalled stub.
 > such as `wait_key` check on every iteration. This timer-based cadence keeps
 > the short MCU press event from being skipped by apps that make few built-in
 > calls per frame. A loop that calls no built-in at all will not respond to
-> HOME.
+> HOME. Returning from `fn main` also goes back to the Home Menu.
+
+### The system menu in an app
+
+L + Down + Select opens the system menu in any app started from the Home
+Menu. The ARM11 core draws it and reads the buttons itself, so it opens
+whatever the app is doing (see [`home.md`](home.md), "The system menu").
+Power Off and Cancel are handled there. **Return to Home** is a request the
+app's runtime picks up: the C SDK (1.2) at its next button read, present or
+core command, and the Auric runtime at its next built-in, and each then leaves
+as if HOME had been pressed. The block they share is `AuroraSystemMenuShared`
+at `0x233A8000` (`include/system_menu.h`). The ARM9 writes the first cache
+line: `app_active` (set by `os_install_return()`, cleared by the return stub)
+and `app_caps`, which `os_install_return()` clears and the runtime sets to
+`AURORA_SYSTEM_MENU_CAP_HOME` as it starts (`app_hid_init()` in the C SDK,
+`aur_app_start()` before `fn main` in Auric). The core writes `menu_open`
+and `action`, one line each.
+
+The core cannot leave an app by itself: apps run with interrupts masked, so
+only their runtime can jump to the return stub. An app built before Beta 7
+has no `app_caps`, so its Return to Home says to press HOME instead; rebuild
+it to get the menu's action.
 
 ### After a crash
 

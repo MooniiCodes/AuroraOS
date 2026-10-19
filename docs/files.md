@@ -66,7 +66,8 @@ The menu acts on the selected item, or on the folder when it is empty:
 * The terminal's `cp`, `mv` and `rm` use the same functions; see
   [`terminal.md`](terminal.md).
 * Copies do not keep their dates. FatFs is built without a clock
-  (`FF_FS_NORTC=1`), so every file it writes is dated 1 June 2025.
+  (`FF_FS_NORTC=1`), so every file it writes is dated 1 June 2026
+  (`FF_NORTC_YEAR` in `include/ffconf.h`; 2025 before Beta 7).
 
 Errors come back as a `FoResult` and are shown in plain words by `fo_error()`:
 a taken name, a full card, a read-only item, or an item that is no longer
@@ -179,6 +180,9 @@ accent colour and the title bar counts them.
   and right move between digits. **A** or **B** leaves it.
 * **START** or Save writes the changes after a confirmation; **SELECT** or Revert
   drops them; **B** or Close leaves, asking first if anything is unsaved.
+  Return to Home in the system menu (L + Down + Select, see
+  [`home.md`](home.md)) leaves without asking and drops unsaved changes, as
+  HOME does in an app.
 
 Changes are held as a list of up to 1,024 (offset, value) pairs, and setting a
 byte back to its original value removes its entry, so the count is of real

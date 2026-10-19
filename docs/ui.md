@@ -87,7 +87,10 @@ channels per multiply) at a time; the pop-up scales the card by sampling it from
 the new frame. If the GPU refuses a copy, the ARM9 does it instead.
 
 The convention: a screen arms `ANIM_PUSH` as it opens and `ANIM_POP` as it
-returns, and the screen it returns to animates when it redraws.
+returns, and the screen it returns to animates when it redraws. While the
+system menu's Return to Home unwinds the screens ([`home.md`](home.md)),
+`anim_transition()` ignores `ANIM_POP`, so they close at once instead of
+sliding one by one.
 `open_screen()` in `os_main.c` does this for the screens it opens; the File
 Explorer, the terminal, the text viewer and the hex editor do it themselves.
 Dialogs pop up and arm a fade for whatever the caller draws next, so they fade

@@ -127,9 +127,18 @@ a fixed arena and unmounts. Loading is all-or-nothing: any inconsistency leaves
 `assets_ok()` false and the UI on its built-in art, so a stale or truncated pack
 degrades rather than corrupts.
 
+The checks (`assets_read()`): the index starts right after the header; each
+entry has a known id seen only once, sizes that are not zero, and a payload
+inside the file; each RLE stream decodes to exactly its size; an image is
+`w*h` bytes (`w*h*4` for RGBA), and a font's head, glyphs and atlas add up; the
+entries fill exactly the arena size the header names; and all four fonts are
+present. A card that does not answer at once gets three tries. When the pack
+still fails, the OS says so once at boot ("assets.pak not loaded / Using
+built-in art. Press A.") and carries on with the 8x8 font and 1-bit icons.
+
 The arena is at `0x23F40000`, in the 768KB gap between the bottom backbuffer
 (which ends by `0x23F38400`) and the app-launch staging area at `0x24000000`.
-The current pack decodes to 717,568 bytes, 91% of the gap. `ASSET_ARENA_NEEDED` is emitted into
+The current pack (184 assets) decodes to 723,968 bytes, 92% of the gap. `ASSET_ARENA_NEEDED` is emitted into
 `asset_ids.h` and checked against `ASSETS_ARENA_MAX` at compile time, so a pack
 that outgrew the gap fails the build rather than the console.
 
@@ -143,7 +152,10 @@ Because the pack lives on the card, the payload only grew by about 5KB.
 3. `make assets`. This rewrites `Aurora/assets.pak` and regenerates
    `include/asset_ids.h`.
 4. Rebuild the OS, and copy the new pack to the card. The pack and the binary
-   are checked against each other at load time, so both must be updated.
+   are checked against each other at load time, so both must be updated. An
+   added asset moves the ids after it (Beta 7's team avatar moved the
+   wallpaper and the fonts), and an older pack is then refused because its
+   fonts are no longer where the OS looks.
 
 The builder asserts that every payload survives an RLE round-trip, so a pack
 that writes successfully decodes correctly.

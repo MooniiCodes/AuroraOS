@@ -78,6 +78,10 @@ again; the first then lists the apps with updates.
 | Download | **B** cancels (it stops after the piece coming in); when it ends, **A** or **B** | tap Cancel between pieces, then OK |
 | Options | Up/Down and **A**; **B** or **X** closes | tap an item; a tap outside the card closes it |
 
+The Circle Pad works as the D-pad on every aShop screen except the page, where
+it scrolls smoothly instead (`page_screen` turns the D-pad mapping off with
+`set_cpad_nav_enabled(0)` while it runs).
+
 ## Downloads
 
 An app comes in pieces (`GET /v1/store/files/<sha256>.bin` with a `Range`

@@ -57,12 +57,71 @@ drain the ARM9 write buffer, then write bit 0 or bit 2 of `0x20` and wait for
 the power to go. The screens go off first because the MCU can hang otherwise.
 Neither function returns.
 
-The Home Menu's power icon (after asking) and its old-core prompt use
+The Home Menu's power icon (after asking), its old-core prompt and the system
+menu's Power Off (L + Down + Select, [`home.md`](home.md)) use
 `power_shutdown()`,
 and the terminal's `shutdown`, `poweroff`, `reboot` and `systemctl
 poweroff|reboot` use both. The crash handler keeps its own copy of the
 power-off sequence in `src/os/crash.c`, so a fault never depends on more code
 than it has to.
+
+Inside an app the system menu runs on the ARM11 core, so from core 118
+`src/power.c` and `src/i2c.c` are compiled a second time for the core
+(`build/os_power11.o`, `build/os_i2c11.o`) and the core calls the same
+`power_shutdown()`. The drain instruction is a data synchronisation barrier on
+the ARM11. A change to either file changes the core, so it needs an
+`AUDIO_CORE_VERSION` bump.
+
+## Screen brightness
+
+Each panel's LCD block (`0x10202200` top, `0x10202A00` bottom; 3dbrew "LCD
+Registers") holds the backlight: `+0x40` is the PWM duty (bits 0-9, 0 turns
+the light off) and `+0x44` the period minus one (bits 0-9) with bit 16 the
+enable; boot code and libn3ds set `0x1023E`, a period of 575. Bit 0 of `+0x00`
+turns on ABL, the adaptive backlight, which moves the duty with the picture.
+The ARM9 data-aborts on that block, so the ARM11 core does the work:
+`audio_set_brightness(level)` (`src/os/Audio9.c`) waits for a pending GPU
+present, then posts `AUDIO_CMD_BRIGHTNESS` (14) with a level from 0 to 4.
+
+From core 119, `backlight11_set()` in `src/os/Core11.c`:
+
+1. turns ABL off on both panels, as libn3ds does "for steady PWM output",
+   since a set level would not hold with it on;
+2. enables the PWM with the usual period if bit 16 is clear;
+3. writes the duty for that level and panel, scaled to the period found.
+
+The duties come from libn3ds's default calibration (launch-day Old 3DS): the
+3DS's five steps are 20, 43, 73, 95 and 117 cd/m2, and a quadratic per panel
+turns them into PWM.
+
+| Level | Top (2D) | Top (3D) | Bottom |
+|-------|----------|----------|--------|
+| 1 / 5 | 15 | 36 | 32 |
+| 2 / 5 | 33 | 80 | 71 |
+| 3 / 5 | 57 | 140 | 123 |
+| 4 / 5 | 75 | 187 | 162 |
+| 5 / 5 | 94 | 237 | 203 |
+
+The top panel needs less drive than the bottom one in 2D and more behind the
+parallax barrier, so `stereo11_mode()` calls `backlight11_refresh()` when the
+top screen goes in or out of 3D. Core 117 and 118 wrote 20, 43, 73, 95 or 117
+(the luminance itself) to both panels and left ABL as it was. After every
+change the core copies the top flags, the top duty, the top PWM register and
+the bottom duty into `AudioCtrl.diag4` to `diag7`.
+
+**Settings > Brightness**: A opens the screen. Five bars on the bottom screen
+and "N / 5" on the top; Left/Right (also Up/Down or the circle pad), or a tap
+on a bar, changes the level at once. A saves it in `SD:\Aurora\USER.dat` at
+offset 51, B puts the old level back. The top screen's last line shows the
+duties the core read back ("Backlight PWM 75 / 162", plus "ABL on" if the bit
+did not clear), which tells a level that did not reach the panel from one
+that did. Left/Right on the Settings row itself also steps the level and
+saves it. At boot `os_main()` sends the saved level, or level 3 ("4 / 5")
+for a file without one. The byte is read only from
+`USER_DAT_VERSION` 3 files: older ones have a zero there, which would be the
+darkest level. The launcher's own Settings
+(`set_brightness()` in `src/main.c`) still only stores the value, since the
+firm's ARM9 has no core to ask.
 
 ## What the UI shows
 
@@ -84,6 +143,8 @@ Which console Aurora is running on comes from `CFG11_SOCINFO` (`0x10140FFC`).
 Bit 0 is set on every retail unit; **bit 1 is set on the New 3DS family**, which
 is the bit that matters. `src/model.c` / `include/model.h` wrap it, and the home
 menu's status bar shows an **N** on a New model and nothing on an Old one.
+Text names the family: "New 3DS/2DS" or "Old 3DS/2DS" (About, `systemctl`,
+the clock-switch messages), since the bit cannot tell a 2DS from a 3DS.
 
 That register is ARM11 config space, so the ARM9 cannot read it directly. The
 ARM11 core samples it once at start-up into `AudioCtrl.socinfo` and the ARM9

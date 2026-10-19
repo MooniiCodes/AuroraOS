@@ -49,9 +49,11 @@ Errors are red and warnings yellow.
 | **R** | switch between letters and symbols (same as `?123` / `abc`) |
 | D-pad up / down | older / newer command from the history |
 | D-pad left / right | move the cursor along the line |
+| Circle pad | the same as the D-pad, as in every OS screen |
 | **SELECT** | cancel the line, like Ctrl+C (it shows `^C`); hold it to stop a long `cp`, `rm` or `cat` |
 | **START** | close the terminal |
 | **L** + **R** | screenshot, as on every screen |
+| **L** + Down + **SELECT** | the system menu ([`home.md`](home.md)); its Return to Home closes the terminal, since **B** here is Delete |
 
 ### Touch keyboard
 
@@ -254,7 +256,7 @@ cp [-r] [-n] SRC... DIR
 * A folder cannot be copied into itself.
 * The line below the output shows `Copying NAME 45%`. Holding **SELECT** stops
   the copy. A copy that fails or is stopped deletes what it made.
-* Copies are dated 1 June 2025, like everything Aurora writes, because FatFs is
+* Copies are dated 1 June 2026, like everything Aurora writes, because FatFs is
   built without a clock (`FF_FS_NORTC`).
 
 ```
@@ -620,7 +622,7 @@ uname [-a] [-s] [-n] [-r] [-m] [-o]
 |--------|--------|
 | `-s` | `AuroraOS` (the default) |
 | `-n` | the host, `n3ds` or `o3ds` |
-| `-r` | the version, for example `Beta 6 v0.1.5` |
+| `-r` | the version, for example `Beta 7 v0.1.6` |
 | `-m` | `armv5tel`, the ARM9 |
 | `-o` | `AuroraOS` |
 | `-a` | all of the above, in that order |
