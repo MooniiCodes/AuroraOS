@@ -244,7 +244,7 @@ static void btn_rect(int b, int *x, int *y, int *w, int *h) {
     *x = BAR_X + 37;
     *w = back_w();
   } else {
-    *x = BW - 46;
+    *x = BW - 42;
     *w = 32;
   }
 }
