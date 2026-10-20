@@ -79,6 +79,14 @@ icon when it is empty.
 | Swipe left or right | turns the page; the grid follows the stylus |
 | Hold a tile (half a second) | picks it up: drag it, or let go without moving for the action menu |
 
+### Wallpaper themes
+
+Settings > Theme lists compatible folders in `SD:/Aurora/themes`. Each theme
+folder should contain opaque PNG backgrounds named `top.png` (400 x 240) and
+`bottom.png` (320 x 240). Aurora creates the `Themes` folder when needed and
+remembers the selected folder in `SD:/Aurora/theme.txt`. Choose **Aurora** in
+the list to return to the built-in background.
+
 ### The action menu (Y)
 
 | Item | Does |
