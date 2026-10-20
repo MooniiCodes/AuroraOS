@@ -896,10 +896,12 @@ static void carry_keys(u32 k) {
     cancel_carry();
 }
 
-enum { MI_MOVE, MI_MOVE_TO, MI_NEW, MI_RENAME, MI_REMOVE, MI_COUNT };
+enum { MI_MOVE, MI_MOVE_TO, MI_NEW, MI_RENAME, MI_REMOVE, MI_DELETE_APP,
+       MI_COUNT };
 static const StringId mi_label[MI_COUNT] = {STR_MOVE, STR_MOVE_TO,
                                             STR_NEW_FOLDER, STR_RENAME,
-                                            STR_REMOVE_FOLDER};
+                                            STR_REMOVE_FOLDER,
+                                            STR_DELETE_APP};
 
 #define MN_X     12
 #define MN_Y     10
@@ -986,6 +988,8 @@ static int menu_run(int e) {
     on[MI_NEW] = (u8)(hl_depth(view) + 1 + hl_height(e) <= HOME_DEPTH &&
                       hl_folders_free() > 0);
   on[MI_RENAME] = on[MI_REMOVE] = (u8)HL_IS_FOLDER(e);
+  on[MI_DELETE_APP] = (u8)(e != HL_NONE && !HL_IS_FOLDER(e) &&
+                            apps[e].path != 0 && hk->remove_app != 0);
   item = 0;
   while (item < MI_COUNT && !on[item])
     item++;
@@ -1169,6 +1173,9 @@ static void act(int item, int k) {
       if (r == HL_OK)
         save();
     }
+  } else if (item == MI_DELETE_APP && e != HL_NONE && !HL_IS_FOLDER(e) &&
+             hk->remove_app) {
+    hk->remove_app(&apps[e]);
   }
   back_home();
   if (r < 0) {

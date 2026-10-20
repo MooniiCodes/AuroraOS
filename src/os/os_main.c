@@ -3574,6 +3574,27 @@ static void home_open(const HomeApp *app) {
   }
 }
 
+static void home_remove_app(const HomeApp *app) {
+  static FATFS delete_fs;
+  if (!app || !app->path ||
+      !fv_confirm(L(STR_DELETE_APP_ASK), app->name, L(STR_DELETE_APP),
+                  L(STR_CANCEL)))
+    return;
+
+  FRESULT fr = f_mount(&delete_fs, "", 1);
+  if (fr == FR_OK)
+    fr = f_unlink(app->path);
+  f_mount(NULL, "", 0);
+  if (fr != FR_OK) {
+    fv_confirm(L(STR_DELETE_APP_FAILED), app->name, L(STR_OK), L(STR_CANCEL));
+    return;
+  }
+
+  scan_apps();
+  build_home();
+  home_reload(home_apps, home_count);
+}
+
 static void home_settings(void) { open_screen(settings_open); }
 
 static void home_terminal(void) { terminal_screen(g_cfg.name, os_launch_app); }
@@ -3581,7 +3602,8 @@ static void home_terminal(void) { terminal_screen(g_cfg.name, os_launch_app); }
 static void os_gpu_late(void);
 
 static const HomeHooks home_hooks = {home_open, home_settings, home_terminal,
-                                     power_off_now, os_gpu_late};
+                                     power_off_now, os_gpu_late,
+                                     home_remove_app};
 
 /* How long the boot waits for a freshly loaded core to take requests. A slower
  * core gets the GPU later, from the Home Menu loop. */
