@@ -178,6 +178,12 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     /* STR_REMOVE_FOLDER */
     {"Remove Folder", "Quitar carpeta",
      "Retirer le dossier"},
+    /* STR_DELETE_APP   */ {"Delete App", "Eliminar app", "Supprimer l'app"},
+    /* STR_DELETE_APP_ASK */ {"Delete this app?", "¿Eliminar esta app?",
+                              "Supprimer cette application ?"},
+    /* STR_DELETE_APP_FAILED */ {"Could not delete the app",
+                                "No se pudo eliminar la app",
+                                "Impossible de supprimer l'application"},
     /* STR_CANCEL       */ {"Cancel", "Cancelar", "Annuler"},
     /* STR_POWER_ASK    */
     {"Turn off the console?", "\u00BFApagar la consola?",

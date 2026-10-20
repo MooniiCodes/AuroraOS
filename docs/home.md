@@ -88,6 +88,7 @@ icon when it is empty.
 | New Folder | asks for a name, then puts the tile in a new folder in its place (on an empty slot, makes an empty folder) |
 | Rename | a folder's name, on the keyboard |
 | Remove Folder | after asking, if it is not empty: what it holds goes where the folder was |
+| Delete App | on an SD app, asks for confirmation and deletes its `.bin` file |
 
 ## The system menu
 
