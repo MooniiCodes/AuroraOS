@@ -5,6 +5,7 @@
 #include "font.h"
 #include "gpu.h"
 #include "timer.h"
+#include "image.h"
 #include <string.h>
 
 Color g_accent = COLOR_AURORA;
@@ -171,6 +172,41 @@ void ui_icon(volatile u8 *fb, int bx, int by, int box, int sh, u32 asset,
 static u8 *const bg_top = (u8 *)UI_BG_TOP_ADDR;
 static u8 *const bg_bot = (u8 *)UI_BG_BOT_ADDR;
 static int bg_ready;
+static int theme_active;
+
+static int theme_copy(const char *path, u8 *dst, int want_w, int want_h) {
+  Image img;
+  if (image_load(path, &img) != IMG_OK || img.w != want_w ||
+      img.h != want_h)
+    return 0;
+  for (int x = 0; x < want_w; x++) {
+    for (int y = 0; y < want_h; y++) {
+      const u8 *src = img.rgb + ((u32)y * (u32)want_w + (u32)x) * 3u;
+      u8 *p = dst + ((u32)x * (u32)want_h + (u32)(want_h - 1 - y)) * 3u;
+      p[0] = src[2];
+      p[1] = src[1];
+      p[2] = src[0];
+    }
+  }
+  return 1;
+}
+
+int ui_theme_load(const char *top_path, const char *bottom_path) {
+  theme_active = 0;
+  bg_ready = 0;
+  if (!top_path || !bottom_path ||
+      !theme_copy(top_path, bg_top, TOP_SCREEN_WIDTH, TOP_SCREEN_HEIGHT) ||
+      !theme_copy(bottom_path, bg_bot, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT))
+    return 0;
+  theme_active = 1;
+  bg_ready = 1;
+  return 1;
+}
+
+void ui_theme_clear(void) {
+  theme_active = 0;
+  bg_ready = 0;
+}
 
 /* The theme gradient with the pack's pattern tinted over it, or diagonal facets
  * without the pack. Per-pixel and slow, so it runs once. */
@@ -214,6 +250,10 @@ static void bg_compose(u8 *dst, int w, int h) {
 }
 
 void ui_bg_build(void) {
+  if (theme_active) {
+    bg_ready = 1;
+    return;
+  }
   bg_compose(bg_top, TOP_SCREEN_WIDTH, TOP_SCREEN_HEIGHT);
   bg_compose(bg_bot, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT);
   bg_ready = 1;

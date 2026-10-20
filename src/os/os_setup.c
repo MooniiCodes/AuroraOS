@@ -1118,6 +1118,11 @@ static const char *const T[STR_COUNT][LANG_COUNT] = {
     {"Left/Right: change  A: Save  B: Back",
      "Izq./Der.: cambiar  A: Guardar  B: Volver",
      "Gauche/Droite : changer  A : OK  B : Retour"},
+    /* STR_THEME */ {"Theme", "Tema", "Th\u00E8me"},
+    /* STR_NO_THEMES */ {"No compatible themes found", "No hay temas compatibles",
+                         "Aucun th\u00E8me compatible"},
+    /* STR_THEME_HINT */ {"A: Apply   B: Back", "A: Aplicar  B: Volver",
+                          "A : Appliquer  B : Retour"},
 };
 
 const char *L(StringId id) {

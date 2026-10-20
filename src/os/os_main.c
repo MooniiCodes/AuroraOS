@@ -31,6 +31,8 @@
 #include "touch.h"
 #include "user.h"
 #include "wifi.h"
+#include "ff.h"
+#include "image.h"
 
 void delay(volatile u32 cycles) {
   while (cycles--)
@@ -216,6 +218,227 @@ static void open_screen(void (*screen)(void)) {
 #define accent_names   aurora_accent_names
 #define ACCENT_COUNT   AURORA_ACCENT_COUNT
 
+#define THEME_DIR       "Aurora/themes"
+#define THEME_CONFIG    "Aurora/theme.txt"
+#define THEME_MAX       24
+#define THEME_NAME_MAX  64
+
+static FATFS theme_fs;
+static char active_theme[THEME_NAME_MAX];
+static void settings_header(u32 asset, const unsigned char *icon,
+                            const char *title, Color icon_color);
+
+static void theme_path(char *out, const char *name, const char *file) {
+  const char *p = "Aurora/themes/";
+  while (*p) *out++ = *p++;
+  if (name && name[0]) {
+    p = name;
+    while (*p) *out++ = *p++;
+    *out++ = '/';
+  }
+  p = file;
+  while (*p) *out++ = *p++;
+  *out = '\0';
+}
+
+static int theme_name_valid(const char *name) {
+  if (!name || !name[0] ||
+      (name[0] == '.' && (!name[1] || (name[1] == '.' && !name[2]))))
+    return 0;
+  for (const char *p = name; *p; p++)
+    if (*p == '/' || *p == '\\' || *p == ':' || *p < 0x20)
+      return 0;
+  return 1;
+}
+
+static int theme_name_equal(const char *a, const char *b) {
+  while (*a && *a == *b) { a++; b++; }
+  return *a == *b;
+}
+
+/* A compatible theme is a folder with exact-size screen backgrounds. */
+static int theme_compatible(const char *name) {
+  static FIL f;
+  char path[128];
+  u8 sig[8];
+  UINT br;
+  Image img;
+  if (!theme_name_valid(name)) return 0;
+  theme_path(path, name, "top.png");
+  if (f_open(&f, path, FA_READ) != FR_OK) return 0;
+  br = 0;
+  int png = f_read(&f, sig, sizeof(sig), &br) == FR_OK && br == sizeof(sig) &&
+            sig[0] == 0x89 && sig[1] == 'P' && sig[2] == 'N' &&
+            sig[3] == 'G' && sig[4] == 0x0D && sig[5] == 0x0A &&
+            sig[6] == 0x1A && sig[7] == 0x0A;
+  f_close(&f);
+  if (!png || image_load(path, &img) != IMG_OK || img.w != TOP_SCREEN_WIDTH ||
+      img.h != TOP_SCREEN_HEIGHT)
+    return 0;
+  theme_path(path, name, "bottom.png");
+  if (f_open(&f, path, FA_READ) != FR_OK) return 0;
+  br = 0;
+  png = f_read(&f, sig, sizeof(sig), &br) == FR_OK && br == sizeof(sig) &&
+        sig[0] == 0x89 && sig[1] == 'P' && sig[2] == 'N' &&
+        sig[3] == 'G' && sig[4] == 0x0D && sig[5] == 0x0A &&
+        sig[6] == 0x1A && sig[7] == 0x0A;
+  f_close(&f);
+  return png && image_load(path, &img) == IMG_OK &&
+         img.w == BOT_SCREEN_WIDTH && img.h == BOT_SCREEN_HEIGHT;
+}
+
+static int theme_mount_prepare(void) {
+  if (f_mount(&theme_fs, "", 1) != FR_OK) return 0;
+  f_mkdir("Aurora");
+  f_mkdir(THEME_DIR);
+  return 1;
+}
+
+static void theme_boot_load(void) {
+  static FIL f;
+  char saved[THEME_NAME_MAX];
+  char top[128], bottom[128];
+  UINT br = 0;
+  saved[0] = '\0';
+  active_theme[0] = '\0';
+  if (theme_mount_prepare()) {
+    if (f_open(&f, THEME_CONFIG, FA_READ) == FR_OK) {
+      if (f_read(&f, saved, sizeof(saved) - 1, &br) != FR_OK) br = 0;
+      f_close(&f);
+    }
+    saved[br] = '\0';
+    while (br && (saved[br - 1] == '\r' || saved[br - 1] == '\n'))
+      saved[--br] = '\0';
+    if (theme_compatible(saved)) {
+      theme_path(top, saved, "top.png");
+      theme_path(bottom, saved, "bottom.png");
+      if (ui_theme_load(top, bottom)) {
+        for (int i = 0; i < THEME_NAME_MAX - 1 && saved[i]; i++)
+          active_theme[i] = saved[i], active_theme[i + 1] = '\0';
+      }
+    }
+    f_mount(NULL, "", 0);
+  }
+}
+
+static int theme_select(const char *name) {
+  static FIL f;
+  char top[128], bottom[128], saved[THEME_NAME_MAX + 2];
+  UINT bw = 0;
+  int ok = 0;
+  if (!theme_mount_prepare()) return 0;
+  if (!name[0]) {
+    ui_theme_clear();
+    active_theme[0] = '\0';
+    ok = 1;
+    saved[0] = '@'; saved[1] = 'd'; saved[2] = 'e'; saved[3] = 'f';
+    saved[4] = 'a'; saved[5] = 'u'; saved[6] = 'l'; saved[7] = 't';
+    saved[8] = '\n';
+    bw = 9;
+  } else if (theme_compatible(name)) {
+    theme_path(top, name, "top.png");
+    theme_path(bottom, name, "bottom.png");
+    if (ui_theme_load(top, bottom)) {
+      int i;
+      for (i = 0; i < THEME_NAME_MAX - 1 && name[i]; i++)
+        active_theme[i] = name[i];
+      active_theme[i] = '\0';
+      for (i = 0; i < THEME_NAME_MAX && name[i]; i++) saved[i] = name[i];
+      saved[i++] = '\n';
+      bw = (UINT)i;
+      ok = 1;
+    }
+  }
+  if (ok && f_open(&f, THEME_CONFIG, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK) {
+    UINT wrote = 0;
+    ok = f_write(&f, saved, bw, &wrote) == FR_OK && wrote == bw;
+    ok = f_close(&f) == FR_OK && ok;
+  }
+  f_mount(NULL, "", 0);
+  if (ok) {
+    ui_bg_invalidate();
+    ui_bg_build();
+  }
+  return ok;
+}
+
+static int theme_scan(char names[THEME_MAX][THEME_NAME_MAX]) {
+  DIR dir;
+  FILINFO info;
+  int n = 1;
+  names[0][0] = '\0'; /* built-in Aurora theme */
+  if (!theme_mount_prepare()) return n;
+  if (f_opendir(&dir, THEME_DIR) == FR_OK) {
+    while (n < THEME_MAX && f_readdir(&dir, &info) == FR_OK && info.fname[0]) {
+      int len = 0;
+      if (!(info.fattrib & AM_DIR) || !theme_name_valid(info.fname)) continue;
+      while (info.fname[len] && len < THEME_NAME_MAX - 1) len++;
+      if (!len || info.fname[len]) continue;
+      char name[THEME_NAME_MAX];
+      for (int i = 0; i <= len; i++) name[i] = info.fname[i];
+      if (!theme_compatible(name)) continue;
+      for (int i = 0; i <= len; i++) names[n][i] = name[i];
+      n++;
+    }
+    f_closedir(&dir);
+  }
+  f_mount(NULL, "", 0);
+  return n;
+}
+
+static void theme_screen(void) {
+  static char names[THEME_MAX][THEME_NAME_MAX];
+  int count = theme_scan(names);
+  int sel = 0, top;
+  for (int i = 0; i < count; i++) {
+    if ((!active_theme[0] && !names[i][0]) ||
+        (active_theme[0] && theme_name_equal(active_theme, names[i]))) {
+      sel = i;
+      break;
+    }
+  }
+  settings_header(ASSET_ICON_DISPLAY_64, icon_brightness_bits, L(STR_THEME), g_accent);
+  while (1) {
+    u32 k = get_keys_down();
+    int tx, ty, activate = 0;
+    top = sel >= 5 ? sel - 4 : 0;
+    ui_wallpaper(VRAM_BOT_A, BOT_SCREEN_WIDTH, BOT_SCREEN_HEIGHT, BOT_SCREEN_HEIGHT);
+    if (count == 1) {
+      ui_text_mid(VRAM_BOT_A, BOT_SCREEN_WIDTH / 2, 66, BOT_SCREEN_HEIGHT,
+                  L(STR_NO_THEMES), COLOR_HM_TEXT2, COLOR_HM_BG_BOT, &ui_font);
+    } else {
+      for (int r = 0; r < 5 && top + r < count; r++) {
+        int i = top + r, y = 12 + r * 37;
+        Color bg = i == sel ? g_accent : COLOR_PANEL_BOT;
+        draw_filled_round_rect(VRAM_BOT_A, 10, y, BOT_SCREEN_WIDTH - 20, 31, 7,
+                               BOT_SCREEN_HEIGHT, bg);
+        ui_text_fit(VRAM_BOT_A, 20, y + 8, BOT_SCREEN_HEIGHT,
+                    names[i][0] ? names[i] : "Aurora", BOT_SCREEN_WIDTH - 40,
+                    COLOR_WHITE, bg, &ui_font);
+      }
+    }
+    ui_text_mid(VRAM_BOT_A, BOT_SCREEN_WIDTH / 2, BOT_SCREEN_HEIGHT - 21,
+                BOT_SCREEN_HEIGHT, L(STR_THEME_HINT), COLOR_HM_TEXT2,
+                COLOR_HM_BG_BOT, &ui_small);
+    screen_present_bottom();
+    if ((k & BUTTON_DUP) && sel > 0) sel--;
+    if ((k & BUTTON_DDOWN) && sel + 1 < count) sel++;
+    if (touch_tap(&tx, &ty) && count > 1) {
+      int row = (ty - 12) / 37;
+      if (ty >= 12 && row >= 0 && row < 5 && top + row < count) {
+        sel = top + row;
+        activate = 1;
+      }
+    }
+    if ((k & BUTTON_A) || activate) {
+      if (theme_select(names[sel]))
+        return;
+    }
+    if (k & BUTTON_B) return;
+    ui_idle();
+  }
+}
+
 static void settings_header(u32 asset, const unsigned char *icon,
                             const char *title, Color icon_color) {
   hm_top_static();
@@ -230,6 +453,7 @@ typedef enum {
   SET_WIFI = 0,
   SET_ACCOUNT,
   SET_ACCENT,
+  SET_THEME,
   SET_CLOCK,
   SET_BRIGHTNESS,
   SET_TOUCHCAL,
@@ -280,6 +504,16 @@ static void settings_content(int id, u32 *asset, const unsigned char **icon,
     case SET_ACCENT:
       *icon = NULL; *name = L(STR_ACCENT_COLOR);
       *value = accent_names[g_accent_idx]; break;
+    case SET_THEME:
+      *asset = ASSET_ICON_DISPLAY_32;
+      *icon = icon_brightness_bits; *name = L(STR_THEME);
+      if (active_theme[0]) {
+        ui_fit(ssid, sizeof(ssid), &ui_font, active_theme, ROW_W - 155);
+        *value = ssid;
+      } else {
+        *value = "Aurora";
+      }
+      break;
     case SET_CLOCK: {
       static char now_text[8];
       RtcTime t;
@@ -2945,6 +3179,7 @@ static void settings_open(void) {
         case SET_WIFI:     sub = wifi_screen; break;
         case SET_ACCOUNT:  sub = account_open; break;
         case SET_ACCENT:   sub = accent_screen; break;
+        case SET_THEME:    sub = theme_screen; break;
         case SET_CLOCK:    sub = clock_screen; break;
         case SET_BRIGHTNESS: sub = brightness_screen; break;
         case SET_TOUCHCAL: sub = touch_cal_screen; break;
@@ -3709,6 +3944,7 @@ void os_main(void) {
   audio_set_brightness(g_brightness);
   if (g_cfg.touch_set && !touch_cal_set(&g_cfg.touch))
     g_cfg.touch_set = 0; /* unusable values: keep the default */
+  theme_boot_load();
   boot_mark(BT_CONFIG);
 
   /* Now that the accent is known. */
