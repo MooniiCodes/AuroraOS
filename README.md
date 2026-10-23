@@ -40,7 +40,7 @@ Aurora is a custom OS for the Nintendo 3DS. **Current version: Beta 7 v0.1.6.**
 | 3D models (GLB) | working on a New 3DS | **3D Model** on the Home Menu shows `SD:/Aurora/model.glb` with its textures: circle pad orbits, D-pad pans, Y and A zoom; the nearest part sets the 3D depth and is named on the bottom screen; see [`docs/glb.md`](docs/glb.md) |
 | 3D (GPU) | working on a New 3DS | the PICA200's 3D pipeline from command lists, with vertex buffers and mipmapped textures; see [`docs/stereo3d.md`](docs/stereo3d.md) |
 | 3D (software) | working | the ARM9 renderer, which draws the model viewer's fallback cube; see [`docs/soft3d.md`](docs/soft3d.md) |
-| Stereoscopic 3D screen | working on a New 3DS | the 3D slider puts the top screen in 3D, with the parallax barrier on every 3DS model (and the New 3DS's movable mask); Old 3DS untested; see [`docs/stereo3d.md`](docs/stereo3d.md) |
+| Stereoscopic 3D screen | working on a New 3DS | the 3D slider puts the top screen in 3D, with the parallax barrier on every 3DS model (and the New 3DS's movable mask); Old 3DS turns on, but doesn't show the 3D well; see [`docs/stereo3d.md`](docs/stereo3d.md) |
 | ARM11 core updates | working | a core from another build is swapped out without a power-off, from core 83 on; see [`docs/audio.md`](docs/audio.md) |
 | Clock + battery | working | MCU over I2C, with Aurora's own clock offset in Settings > Clock (the RTC is never written); see [`docs/power.md`](docs/power.md) |
 | Screen brightness | new | Settings > Brightness: five levels on both backlights, calibrated per panel (and for the top in 3D), set by the ARM11 core (core 119) and kept in `USER.dat`; see [`docs/power.md`](docs/power.md) |
