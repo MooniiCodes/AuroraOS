@@ -16,6 +16,7 @@ The 36-byte header (little-endian) mirrors `aos_header_t` in include/loader.h:
     uint32_t arm11_load_addr
     uint32_t arm11_entry
 """
+
 import argparse
 import struct
 import sys
@@ -40,7 +41,9 @@ DEFAULT_ARM11_LOAD = 0x24000000
 def _overlaps(addr: int, size: int, region: tuple[int, int]) -> bool:
     if size == 0:
         return False
+        
     lo, hi = region
+    
     return addr < hi and (addr + size) > lo
 
 
@@ -54,12 +57,15 @@ def pack(
     arm11_entry: int,
 ) -> None:
     arm9 = arm9_path.read_bytes()
+    
     if not arm9:
         raise ValueError(f"{arm9_path} is empty")
+        
     arm11 = arm11_path.read_bytes() if arm11_path else b""
 
     arm9_offset = HEADER_SIZE
     arm9_size = len(arm9)
+    
     if arm11:
         arm11_offset = HEADER_SIZE + arm9_size
         arm11_size = len(arm11)
@@ -76,6 +82,7 @@ def pack(
             f"{LOADER_ARM9_RANGE[1]:#010x}",
             file=sys.stderr,
         )
+    
     if _overlaps(arm11_load, arm11_size, LOADER_ARM11_RANGE):
         print(
             f"warning: ARM11 payload "
@@ -104,9 +111,11 @@ def pack(
         f.write(arm11)
 
     total = HEADER_SIZE + arm9_size + arm11_size
+    
     print(f"Wrote {output_path} ({total} bytes)")
     print(f"  ARM9 : offset {arm9_offset:#x}  size {arm9_size}  "
           f"load {arm9_load:#010x}  entry {arm9_entry:#010x}")
+    
     if arm11_size:
         print(f"  ARM11: offset {arm11_offset:#x}  size {arm11_size}  "
               f"load {arm11_load:#010x}  entry {arm11_entry:#010x}")
@@ -116,6 +125,7 @@ def pack(
 
 def info(path: Path) -> None:
     data = path.read_bytes()
+    
     if len(data) < HEADER_SIZE or data[:4] != MAGIC:
         raise ValueError(f"{path} is not an AOS1 container (bad magic)")
 
@@ -134,6 +144,7 @@ def info(path: Path) -> None:
     print(f"{path}: {magic.decode('ascii', 'replace')} container, {len(data)} bytes")
     print(f"  ARM9 : offset {arm9_offset:#x}  size {arm9_size}  "
           f"load {arm9_load:#010x}  entry {arm9_entry:#010x}")
+    
     if arm11_size:
         print(f"  ARM11: offset {arm11_offset:#x}  size {arm11_size}  "
               f"load {arm11_load:#010x}  entry {arm11_entry:#010x}")
@@ -142,6 +153,7 @@ def info(path: Path) -> None:
 
     if arm9_offset + arm9_size > len(data):
         print("  ERROR: ARM9 payload runs past end of file", file=sys.stderr)
+        
     if arm11_size and arm11_offset + arm11_size > len(data):
         print("  ERROR: ARM11 payload runs past end of file", file=sys.stderr)
 
@@ -155,20 +167,29 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Pack/inspect AuroraOS AOS1 bootable containers."
     )
+
+    # Define the arguments
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_pack = sub.add_parser("pack", help="Build an AOS1 container")
+    
     p_pack.add_argument("arm9", type=Path, help="ARM9 payload binary")
+    
     p_pack.add_argument("arm11", type=Path, nargs="?",
                         help="ARM11 payload binary (optional)")
+    
     p_pack.add_argument("-o", "--output", type=Path, default=Path("aurora_os.bin"),
                         help="Output file (default: aurora_os.bin)")
+    
     p_pack.add_argument("--arm9-load", type=_auto, default=DEFAULT_ARM9_LOAD,
                         help=f"ARM9 load address (default: {DEFAULT_ARM9_LOAD:#x})")
+    
     p_pack.add_argument("--arm9-entry", type=_auto, default=None,
                         help="ARM9 entry address (default: = load address)")
+    
     p_pack.add_argument("--arm11-load", type=_auto, default=DEFAULT_ARM11_LOAD,
                         help=f"ARM11 load address (default: {DEFAULT_ARM11_LOAD:#x})")
+    
     p_pack.add_argument("--arm11-entry", type=_auto, default=None,
                         help="ARM11 entry address (default: = load address)")
 
@@ -177,6 +198,7 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    # Get the commands the user inputted
     try:
         if args.command == "pack":
             arm9_entry = (
@@ -184,11 +206,13 @@ def main() -> None:
                 if args.arm9_entry is not None
                 else args.arm9_load
             )
+            
             arm11_entry = (
                 args.arm11_entry
                 if args.arm11_entry is not None
                 else args.arm11_load
             )
+            
             pack(args.arm9, args.arm11, args.output,
                  args.arm9_load, arm9_entry, args.arm11_load, arm11_entry)
         elif args.command == "info":
